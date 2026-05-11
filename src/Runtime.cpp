@@ -1,5 +1,3 @@
-#include<Runtime.hpp>
+#include <Runtime.hpp>
 
-void Runtime::start() {
-    std::cout << "Runtime started." << std::endl;
-}
+void Runtime::start() { std::cout << "Runtime started." << "\n"; }

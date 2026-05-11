@@ -1,8 +1,7 @@
-#include<Runtime.hpp>
-#include<iostream>
+#include <Runtime.hpp>
+#include <iostream>
 
-int main() {
-    Runtime runtime;
-    runtime.start();
+int main(int argc, char* argv[]) {
+    Runtime::start();
     return 0;
 }

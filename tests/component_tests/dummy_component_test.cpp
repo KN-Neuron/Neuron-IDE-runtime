@@ -1,5 +1,3 @@
 #include <gtest/gtest.h>
 
-TEST(DummyComponentTest, AlwaysPasses) {
-    EXPECT_TRUE(true);
-}
+TEST(DummyComponentTest, AlwaysPasses) { EXPECT_TRUE(true); }

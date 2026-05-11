@@ -4,10 +4,10 @@
 #include <iostream>
 
 class Runtime {
-public:
-    Runtime() = default;
+   public:
+    Runtime()  = default;
     ~Runtime() = default;
-    void start();
+    static void start();
 };
 
-#endif // RUNTIME_HPP
+#endif  // RUNTIME_HPP
