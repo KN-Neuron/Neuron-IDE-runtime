@@ -8,10 +8,16 @@ add_library(runtime_core
 )
 target_include_directories(runtime_core SYSTEM PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${CMAKE_CURRENT_BINARY_DIR}                 # Tutaj CMake wrzuca wygenerowane pliki scene.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${SDL2_INCLUDE_DIRS}
 )
 
-target_link_libraries(runtime_core PUBLIC protobuf::libprotobuf)
+target_link_libraries(runtime_core PUBLIC 
+    lsl
+    concurrentqueue
+    protobuf::libprotobuf
+    ${SDL2_LIBRARIES}
+)
 
 add_executable(NeuronIDE main.cpp)
 target_link_libraries(NeuronIDE PRIVATE runtime_core)
