@@ -23,6 +23,5 @@ target_link_libraries(runtime_core PUBLIC
     ${SDL2_LIBRARIES}
 )
 
-
 add_executable(NeuronIDE main.cpp)
 target_link_libraries(NeuronIDE PRIVATE runtime_core)
