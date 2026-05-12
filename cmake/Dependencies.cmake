@@ -29,3 +29,6 @@ FetchContent_MakeAvailable(concurrentqueue)
 
 # 4. SDL2 (System installed)
 find_package(SDL2 REQUIRED)
+
+# 5. Protobuf (System installed)
+find_package(Protobuf REQUIRED)
