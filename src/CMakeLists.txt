@@ -6,13 +6,14 @@ add_library(runtime_core
     ${PROTO_SRCS} 
     ${PROTO_HDRS}
 )
+
 target_include_directories(runtime_core SYSTEM PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_BINARY_DIR}
     ${SDL2_INCLUDE_DIRS}
 )
 
-target_link_libraries(runtime_core PUBLIC 
+target_link_libraries(runtime_core PUBLIC
     lsl
     concurrentqueue
     protobuf::libprotobuf
