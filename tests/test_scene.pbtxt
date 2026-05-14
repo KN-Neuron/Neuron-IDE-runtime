@@ -1,0 +1,45 @@
+project_name: "Moj Pierwszy Eksperyment"
+
+scene_objects {
+  name: "Gracz"
+  is_visible: true
+  
+  transform {
+    x: 100.0
+    y: 200.0
+    width: 64.0
+    height: 64.0
+    rotation: 0.0
+  }
+  
+  components {
+    blinker {
+      blink_frequency_hz: 1.5
+    }
+  }
+  
+  components {
+    blinker {
+      blink_frequency_hz: 3
+    }
+  }
+}
+
+scene_objects {
+  name: "Napis Powitalny"
+  is_visible: true
+  
+  transform {
+    x: 400.0
+    y: 50.0
+    width: 300.0
+    height: 100.0
+    rotation: 0.0
+  }
+  
+  components {
+    blinker {
+      blink_frequency_hz: 5
+    }
+  }
+}
