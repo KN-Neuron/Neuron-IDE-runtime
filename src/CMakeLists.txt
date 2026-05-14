@@ -1,12 +1,28 @@
-add_library(runtime_core Runtime.cpp)
-target_include_directories(runtime_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS neuronide.proto)
 
-target_link_libraries(runtime_core PUBLIC 
+add_library(runtime_core OBJECT
+    Runtime.cpp
+    parser/Parser.cpp
+    scene/components/ComponentRegistry.cpp
+    scene/components/BlinkComponent.cpp
+    scene/SceneObject.cpp
+    ${PROTO_SRCS} 
+    ${PROTO_HDRS}
+)
+
+target_include_directories(runtime_core SYSTEM PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${SDL2_INCLUDE_DIRS}
+)
+
+target_link_libraries(runtime_core PUBLIC
     lsl
     concurrentqueue
+    protobuf::libprotobuf
     ${SDL2_LIBRARIES}
 )
-target_include_directories(runtime_core PUBLIC ${SDL2_INCLUDE_DIRS})
+
 
 add_executable(NeuronIDE main.cpp)
 target_link_libraries(NeuronIDE PRIVATE runtime_core)
