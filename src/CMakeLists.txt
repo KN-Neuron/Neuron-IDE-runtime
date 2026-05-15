@@ -1,8 +1,8 @@
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/../proto/neuronide.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/../protoFiles/neuronide.proto)
 
 add_library(runtime_core 
     Runtime.cpp
-    Parser.cpp 
+    parser/Parser.cpp 
     ${PROTO_SRCS} 
     ${PROTO_HDRS}
 )

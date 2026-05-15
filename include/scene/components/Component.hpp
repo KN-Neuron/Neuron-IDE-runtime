@@ -8,8 +8,8 @@ public:
 
     Component(const Component&) = default;
     Component(Component&&) = default;
-    auto operator=(const Component&) -> Component& = default;
-    auto operator=(Component&&) -> Component& = default;
+    Component& operator=(const Component&) = default;
+    Component& operator=(Component&&) = default;
 };
 
 #endif // COMPONENT_H
