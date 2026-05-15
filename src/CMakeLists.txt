@@ -1,4 +1,4 @@
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/../proto/neuronide.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/../protoFiles/neuronide.proto)
 
 add_library(runtime_core OBJECT
     Runtime.cpp
@@ -6,7 +6,7 @@ add_library(runtime_core OBJECT
     scene/components/ComponentRegistry.cpp
     scene/components/BlinkComponent.cpp
     scene/SceneObject.cpp
-    ${PROTO_SRCS} 
+    ${PROTO_SRCS}
     ${PROTO_HDRS}
 )
 
