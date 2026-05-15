@@ -64,25 +64,25 @@ std::unique_ptr<Component> Parser::buildComponent(const NeuronIDE::Component& pr
     using CT = NeuronIDE::Component::ComponentTypeCase;
 
     switch (protoComp.component_type_case()) {
-        case CT::kRenderer: {
+        /*case CT::kRenderer: {
             const auto& ren = protoComp.renderer();
-            return std::make_unique<SpriteRenderer>(ren.texture_path(), ren.img_path());
+            return std::make_unique<SpriteRenderer>();
         }
 
         case CT::kText: {
             const auto& txt = protoComp.text();
-            return std::make_unique<TextRenderer>(txt.text(), txt.font_path(), txt.font_size());
-        }
+            return std::make_unique<TextRenderer>();
+        }*/
 
         case CT::kBlinker: {
             const auto& bli = protoComp.blinker();
             return std::make_unique<BlinkComponent>(bli.blink_frequency_hz());
         }
 
-        case CT::kScript: {
+        /*case CT::kScript: {
             const auto& scr = protoComp.script();
-            return std::make_unique<ScriptComponent>(scr.script_path());
-        }
+            return std::make_unique<ScriptComponent>();
+        }*/
 
         default:
             return nullptr;
