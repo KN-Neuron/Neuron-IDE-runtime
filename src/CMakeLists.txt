@@ -1,8 +1,10 @@
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/../protoFiles/neuronide.proto)
 
-add_library(runtime_core 
+add_library(runtime_core OBJECT
     Runtime.cpp
-    parser/Parser.cpp 
+    parser/Parser.cpp
+    scene/components/ComponentRegistry.cpp
+    scene/components/BlinkComponent.cpp
     ${PROTO_SRCS} 
     ${PROTO_HDRS}
 )
