@@ -59,3 +59,11 @@ cmake --build build --target format
 ```
 
 This will run `clang-format -i` over all trackable source and header files, applying the style configuration specified in the project. 
+
+### 5. Working with protobuf files
+
+In case you want to create an example .pb file for testing or some other purpose, you have to first create a .pbtxt file (check out protoFiles/tests/test_scene.pbtxt for reference) which you then compile with this command:
+
+```bash
+protoc --encode=NeuronIDE.Scene protoFiles/neuronide.proto < protoFiles/tests/test_scene.pbtxt > protoFiles/tests/test_scene.pb
+```
