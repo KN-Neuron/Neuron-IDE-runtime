@@ -11,4 +11,4 @@
 // 3. Wszystkie konkretne komponenty
 #include "components/BlinkComponent.hpp"
 
-#endif // SCENE_ALL_HPP
+#endif  // SCENE_ALL_HPP

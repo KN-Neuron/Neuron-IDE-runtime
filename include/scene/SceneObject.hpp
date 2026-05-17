@@ -1,26 +1,25 @@
 #ifndef SCENEOBJECT_HPP
 #define SCENEOBJECT_HPP
 
+#include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
-#include <iostream>
+
 #include "components/Component.hpp"
 
 class SceneObject {
-public:
+   public:
     std::string name;
-    bool isVisible = true;
-    
-    // Struktura trzymająca pozycję
+    bool        isVisible = true;
+
     struct Transform {
         double posX = 0, posY = 0, width = 0, height = 0, rotation = 0;
     } transform;
 
     std::vector<std::unique_ptr<Component>> components;
 
-    SceneObject(std::string n, bool visible = true) 
-        : name(std::move(n)), isVisible(visible) {
+    SceneObject(std::string n, bool visible = true) : name(std::move(n)), isVisible(visible) {
         std::cout << "  [SceneObject] Utworzono obiekt: " << name << "\n";
     }
 
@@ -28,9 +27,7 @@ public:
         transform = {posX, posY, width, height, rotation};
     }
 
-    void addComponent(std::unique_ptr<Component> comp) {
-        components.push_back(std::move(comp));
-    }
+    void addComponent(std::unique_ptr<Component> comp) { components.push_back(std::move(comp)); }
 };
 
-#endif // SCENEOBJECT_HPP
+#endif  // SCENEOBJECT_HPP

@@ -2,23 +2,21 @@
 #define PARSER_HPP
 
 #include <iostream>
-#include <string>
 #include <memory>
+#include <string>
 
-#include "scene/SceneAll.hpp"
 #include "neuronide.pb.h"
+#include "scene/SceneAll.hpp"
 
 class Parser {
-public:
+   public:
     Parser() = default;
 
-    // Parsuje plik protobuff .proto -> natywna Scene 
-    std::shared_ptr<::Scene> parse(const std::string& filePath);
+    std::shared_ptr<Scene> parse(const std::string& filePath);
 
-private:
-    // Konwertery proto -> typy sceny
+   private:
     static std::shared_ptr<SceneObject> buildSceneObject(const NeuronIDE::SceneObject& protoObj);
-    static std::unique_ptr<Component> buildComponent(const NeuronIDE::Component& protoComp);
+    static std::unique_ptr<Component>   buildComponent(const NeuronIDE::Component& protoComp);
 };
 
 #endif  // PARSER_HPP
