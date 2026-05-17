@@ -5,8 +5,14 @@
 #include <memory>
 #include <string>
 
-#include "neuronide.pb.h"
-#include "scene/SceneAll.hpp"
+class Scene;
+class SceneObject;
+class Component;
+
+namespace NeuronIDE {
+class SceneObject;
+class Component;
+}  // namespace NeuronIDE
 
 class Parser {
    public:

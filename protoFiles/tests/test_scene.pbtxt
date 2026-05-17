@@ -17,12 +17,6 @@ scene_objects {
       blink_frequency_hz: 1.5
     }
   }
-  
-  components {
-    blinker {
-      blink_frequency_hz: 3
-    }
-  }
 }
 
 scene_objects {
