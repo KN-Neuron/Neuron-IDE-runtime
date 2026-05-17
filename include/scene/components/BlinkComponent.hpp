@@ -2,8 +2,13 @@
 #define BLINKCOMPONENT_HPP
 
 #include <iostream>
+#include <memory>
 
 #include "Component.hpp"
+
+namespace NeuronIDE {
+class Component;
+}
 
 class BlinkComponent : public Component {
    public:
@@ -11,7 +16,9 @@ class BlinkComponent : public Component {
         std::cout << "    + [BlinkComponent] Utworzono z czestotliwoscia: " << blinkFrequencyHz
                   << "Hz\n";
     }
-    void setFrequency(double freq) { blinkFrequencyHz = freq; }
+    void setFrequency(double freq);
+
+    static std::unique_ptr<Component> createBlinker(const NeuronIDE::Component& protoComp);
 
    private:
     double blinkFrequencyHz = 0.0;

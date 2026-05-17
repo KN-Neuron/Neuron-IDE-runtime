@@ -1,14 +1,16 @@
 #include "parser/Parser.hpp"
 
-#include <google/protobuf/text_format.h>  // dla .pbtxt jeśli będzie potrzeba
-
 #include <fstream>
 #include <stdexcept>
+#include <unordered_set>
 
 #include "neuronide.pb.h"
-#include "scene/SceneAll.hpp"
+#include "scene/Scene.hpp"
+#include "scene/SceneObject.hpp"
+#include "scene/components/Component.hpp"
+#include "scene/components/ComponentRegistry.hpp"
 
-std::shared_ptr<::Scene> Parser::parse(const std::string& filePath) {
+std::shared_ptr<Scene> Parser::parse(const std::string& filePath) {
     NeuronIDE::Scene protoScene;
 
     std::ifstream file(filePath, std::ios::binary);
@@ -36,10 +38,19 @@ std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObje
 
     if (protoObj.has_transform()) {
         const auto& tra = protoObj.transform();
-        obj->setTransform(tra.x(), tra.y(), tra.width(), tra.height(), tra.rotation());
+        obj->setTransform({tra.x(), tra.y(), tra.width(), tra.height(), tra.rotation()});
     }
 
+    std::unordered_set<int> seenComponentTypes;
+
     for (const auto& protoComp : protoObj.components()) {
+        int typeId = static_cast<int>(protoComp.component_type_case());
+        
+        if (seenComponentTypes.find(typeId) != seenComponentTypes.end()) {
+            throw std::runtime_error("Parser: duplicate component type in object '" + protoObj.name() + "'.");
+        }
+        seenComponentTypes.insert(typeId);
+
         auto comp = buildComponent(protoComp);
         if (comp) {
             obj->addComponent(std::move(comp));
@@ -50,31 +61,5 @@ std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObje
 }
 
 std::unique_ptr<Component> Parser::buildComponent(const NeuronIDE::Component& protoComp) {
-    using CT = NeuronIDE::Component::ComponentTypeCase;
-
-    switch (protoComp.component_type_case()) {
-            // case CT::kRenderer: {
-            //     const auto& ren = protoComp.renderer();
-            //     return std::make_unique<SpriteRenderer>(ren.texture_path(), ren.img_path());
-            // }
-
-            // case CT::kText: {
-            //     const auto& txt = protoComp.text();
-            //     return std::make_unique<TextRenderer>(txt.text(), txt.font_path(),
-            //     txt.font_size());
-            // }
-
-        case CT::kBlinker: {
-            const auto& bli = protoComp.blinker();
-            return std::make_unique<BlinkComponent>(bli.blink_frequency_hz());
-        }
-
-            // case CT::kScript: {
-            //     const auto& scr = protoComp.script();
-            //     return std::make_unique<ScriptComponent>(scr.script_path());
-            // }
-
-        default:
-            return nullptr;
-    }
+    return ComponentRegistry::instance().build(protoComp);
 }

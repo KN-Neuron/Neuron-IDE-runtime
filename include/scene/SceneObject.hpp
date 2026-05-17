@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "components/Component.hpp"
+class Component;
 
 class SceneObject {
    public:
@@ -23,9 +23,7 @@ class SceneObject {
         std::cout << "  [SceneObject] Utworzono obiekt: " << name << "\n";
     }
 
-    void setTransform(double posX, double posY, double width, double height, double rotation) {
-        transform = {posX, posY, width, height, rotation};
-    }
+    void setTransform(Transform t) { transform = t; }
 
     void addComponent(std::unique_ptr<Component> comp) { components.push_back(std::move(comp)); }
 };

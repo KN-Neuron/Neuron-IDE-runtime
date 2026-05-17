@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "SceneObject.hpp"
+class SceneObject;
 
 class Scene {
    private:
