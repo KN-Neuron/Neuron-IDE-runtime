@@ -25,7 +25,7 @@ class ComponentRegistry {
         return instance;
     }
 
-    void registerCreator(int typeId, ComponentCreatorFunc creator) { creators[typeId] = creator; }
+    void registerCreator(int typeId, ComponentCreatorFunc creator);
 
     std::unique_ptr<Component> build(const NeuronIDE::Component& protoComp);
 
