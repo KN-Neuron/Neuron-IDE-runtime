@@ -19,13 +19,11 @@ class SceneObject {
 
     std::vector<std::unique_ptr<Component>> components;
 
-    SceneObject(std::string n, bool visible = true) : name(std::move(n)), isVisible(visible) {
-        std::cout << "  [SceneObject] Utworzono obiekt: " << name << "\n";
-    }
+    SceneObject(std::string n, bool visible = true);
 
-    void setTransform(Transform t) { transform = t; }
+    void setTransform(Transform t);
 
-    void addComponent(std::unique_ptr<Component> comp) { components.push_back(std::move(comp)); }
+    void addComponent(std::unique_ptr<Component> comp);
 };
 
 #endif  // SCENEOBJECT_HPP
