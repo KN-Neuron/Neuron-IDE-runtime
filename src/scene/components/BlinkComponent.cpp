@@ -9,15 +9,4 @@ std::unique_ptr<Component> BlinkComponent::createBlinker(const NeuronIDE::Compon
     return std::make_unique<BlinkComponent>(protoComp.blinker().blink_frequency_hz());
 }
 
-// Anonymous namespace to register the BlinkComponent creator in the ComponentRegistry at program
-// startup
-namespace {
-struct BlinkRegistrar {
-    BlinkRegistrar() {
-        ComponentRegistry::instance().registerCreator(
-            static_cast<int>(NeuronIDE::Component::kBlinker), BlinkComponent::createBlinker);
-    }
-};
-
-static BlinkRegistrar global_blink_registrar;
-}  // namespace
+REGISTER_COMPONENT(NeuronIDE::Component::kBlinker, BlinkComponent::createBlinker)
