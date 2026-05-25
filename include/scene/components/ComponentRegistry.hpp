@@ -38,15 +38,15 @@ class ComponentRegistry {
 #define COMPONENT_REGISTRATION_CONCAT_IMPL(x, y) x##y
 #define COMPONENT_REGISTRATION_CONCAT(x, y) COMPONENT_REGISTRATION_CONCAT_IMPL(x, y)
 
-#define REGISTER_COMPONENT(typeId, creatorFunc)                                                  \
-    namespace {                                                                                  \
-    struct COMPONENT_REGISTRATION_CONCAT(ComponentRegistrar_, __LINE__) {                        \
-        COMPONENT_REGISTRATION_CONCAT(ComponentRegistrar_, __LINE__)() {                         \
-            ComponentRegistry::instance().registerCreator(static_cast<int>(typeId), creatorFunc);\
-        }                                                                                        \
-    };                                                                                           \
-    static COMPONENT_REGISTRATION_CONCAT(ComponentRegistrar_, __LINE__)                          \
-        COMPONENT_REGISTRATION_CONCAT(global_registrar_, __LINE__);                              \
+#define REGISTER_COMPONENT(typeId, creatorFunc)                                                   \
+    namespace {                                                                                   \
+    struct COMPONENT_REGISTRATION_CONCAT(ComponentRegistrar_, __LINE__) {                         \
+        COMPONENT_REGISTRATION_CONCAT(ComponentRegistrar_, __LINE__)() {                          \
+            ComponentRegistry::instance().registerCreator(static_cast<int>(typeId), creatorFunc); \
+        }                                                                                         \
+    };                                                                                            \
+    static COMPONENT_REGISTRATION_CONCAT(ComponentRegistrar_, __LINE__)                           \
+        COMPONENT_REGISTRATION_CONCAT(global_registrar_, __LINE__);                               \
     }
 
 #endif  // COMPONENTREGISTRY_HPP
