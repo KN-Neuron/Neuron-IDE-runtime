@@ -61,7 +61,11 @@ std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObje
     return obj;
 }
 
+<<<<<<< HEAD
 std::unique_ptr<Component> Parser::buildComponent(const NeuronIDE::Component&         protoComp,
                                                   const std::shared_ptr<SceneObject>& owner) {
+=======
+std::unique_ptr<Component> Parser::buildComponent(const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner) {
+>>>>>>> 9d8d705 (refactor: update Component class)
     return ComponentRegistry::instance().build(protoComp, owner);
 }
