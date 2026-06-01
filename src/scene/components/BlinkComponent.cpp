@@ -14,4 +14,9 @@ void BlinkComponent::update(const Context& context) {
     // TODO: implement blinking logic based on blinkFrequencyHz and context.timestamp
 }
 
+void BlinkComponent::render(SDL_Renderer* renderer) {
+    // This component does not render anything itself, it only controls visibility of the owner
+    // object.
+}
+
 REGISTER_COMPONENT(NeuronIDE::Component::kBlinker, BlinkComponent::createBlinker)

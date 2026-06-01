@@ -7,6 +7,8 @@
 #include <vector>
 
 class Component;
+class SDL_Renderer;
+struct Context;
 
 class SceneObject {
    public:
@@ -21,9 +23,12 @@ class SceneObject {
 
     SceneObject(std::string n, bool visible = true);
 
-    void setTransform(Transform t);
+    void setTransform(const Transform& transform);
 
     void addComponent(std::unique_ptr<Component> comp);
+
+    void update(const Context& ctx);
+    void render(SDL_Renderer* renderer);
 };
 
 #endif  // SCENEOBJECT_HPP
