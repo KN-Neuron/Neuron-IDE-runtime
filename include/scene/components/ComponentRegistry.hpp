@@ -29,12 +29,8 @@ class ComponentRegistry {
 
     void registerCreator(int typeId, ComponentCreatorFunc creator);
 
-<<<<<<< HEAD
     std::unique_ptr<Component> build(const NeuronIDE::Component&         protoComp,
                                      const std::shared_ptr<SceneObject>& owner);
-=======
-    std::unique_ptr<Component> build(const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner);
->>>>>>> 9d8d705 (refactor: update Component class)
 
    private:
     ComponentRegistry() = default;
