@@ -2,7 +2,6 @@
 #define BLINKCOMPONENT_HPP
 
 #include <iostream>
-#include <memory>
 
 #include "Component.hpp"
 
@@ -12,13 +11,12 @@ class Component;
 
 class BlinkComponent : public Component {
    public:
-    BlinkComponent(double freq) : blinkFrequencyHz(freq) {
-        std::cout << "    + [BlinkComponent] Utworzono z czestotliwoscia: " << blinkFrequencyHz
-                  << "Hz\n";
-    }
+    BlinkComponent(std::shared_ptr<SceneObject> owner, double freq) : Component(owner), blinkFrequencyHz(freq) {}
     void setFrequency(double freq);
 
-    static std::unique_ptr<Component> createBlinker(const NeuronIDE::Component& protoComp);
+    void update(const Context& context) override;
+
+    static std::unique_ptr<Component> createBlinker(const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner);
 
    private:
     double blinkFrequencyHz = 0.0;

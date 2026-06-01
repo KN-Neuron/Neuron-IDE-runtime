@@ -22,7 +22,7 @@ class Parser {
 
    private:
     static std::shared_ptr<SceneObject> buildSceneObject(const NeuronIDE::SceneObject& protoObj);
-    static std::unique_ptr<Component>   buildComponent(const NeuronIDE::Component& protoComp);
+    static std::unique_ptr<Component>   buildComponent(const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner);
 };
 
 #endif  // PARSER_HPP

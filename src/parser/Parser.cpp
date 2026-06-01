@@ -52,7 +52,7 @@ std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObje
         }
         seenComponentTypes.insert(typeId);
 
-        auto comp = buildComponent(protoComp);
+        auto comp = buildComponent(protoComp, obj);
         if (comp) {
             obj->addComponent(std::move(comp));
         }
@@ -61,6 +61,6 @@ std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObje
     return obj;
 }
 
-std::unique_ptr<Component> Parser::buildComponent(const NeuronIDE::Component& protoComp) {
-    return ComponentRegistry::instance().build(protoComp);
+std::unique_ptr<Component> Parser::buildComponent(const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner) {
+    return ComponentRegistry::instance().build(protoComp, owner);
 }
