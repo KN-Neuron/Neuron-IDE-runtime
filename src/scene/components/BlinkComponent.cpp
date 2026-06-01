@@ -11,7 +11,7 @@ std::unique_ptr<Component> BlinkComponent::createBlinker(
 }
 
 void BlinkComponent::update(const Context& context) {
-    //TODO: implement blinking logic based on blinkFrequencyHz and context.timestamp
+    // TODO: implement blinking logic based on blinkFrequencyHz and context.timestamp
 }
 
 REGISTER_COMPONENT(NeuronIDE::Component::kBlinker, BlinkComponent::createBlinker)
