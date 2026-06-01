@@ -6,6 +6,8 @@
 #include <vector>
 
 class SceneObject;
+class SDL_Renderer;
+struct Context;
 
 class Scene {
    private:
@@ -19,6 +21,9 @@ class Scene {
 
     const std::string& getExperimentName() const { return experimentName; }
     const std::vector<std::shared_ptr<SceneObject>>& getObjects() const { return objects; }
+
+    void update(const Context& ctx);
+    void render(SDL_Renderer* renderer);
 };
 
 #endif  // SCENE_HPP

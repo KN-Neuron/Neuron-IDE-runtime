@@ -4,6 +4,7 @@
 #include <memory>
 
 class SceneObject;
+class SDL_Renderer;
 struct Context;
 
 class Component {
@@ -18,6 +19,7 @@ class Component {
     Component& operator=(Component&&)      = default;
 
     virtual void update(const Context& context) = 0;
+    virtual void render(SDL_Renderer* renderer) = 0;
 
    protected:
     std::weak_ptr<SceneObject> owner;

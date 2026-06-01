@@ -16,6 +16,7 @@ class BlinkComponent : public Component {
     void setFrequency(double freq);
 
     void update(const Context& context) override;
+    void render(SDL_Renderer* renderer) override;
 
     static std::unique_ptr<Component> createBlinker(const NeuronIDE::Component&         protoComp,
                                                     const std::shared_ptr<SceneObject>& owner);
