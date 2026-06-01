@@ -1,15 +1,26 @@
 #ifndef COMPONENT_HPP
 #define COMPONENT_HPP
 
+#include <memory>
+
+class SceneObject;
+struct Context;
+
 class Component {
    public:
-    Component()          = default;
+    Component() = delete;
+    Component(std::shared_ptr<SceneObject> owner) : owner(owner) {}
     virtual ~Component() = default;
 
     Component(const Component&)            = default;
     Component(Component&&)                 = default;
     Component& operator=(const Component&) = default;
     Component& operator=(Component&&)      = default;
+
+    virtual void update(const Context& context) = 0;
+
+   protected:
+    std::weak_ptr<SceneObject> owner;
 };
 
 #endif  // COMPONENT_HPP
