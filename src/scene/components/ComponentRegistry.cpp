@@ -13,8 +13,7 @@ void ComponentRegistry::registerCreator(int typeId, ComponentCreatorFunc creator
     creators[typeId] = std::move(creator);
 }
 
-std::unique_ptr<Component> ComponentRegistry::build(const NeuronIDE::Component&         protoComp,
-                                                    const std::shared_ptr<SceneObject>& owner) {
+std::unique_ptr<Component> ComponentRegistry::build(const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner) {
     auto activeCase = protoComp.component_type_case();
 
     int typeId = static_cast<int>(activeCase);

@@ -11,8 +11,7 @@ class Component;
 }
 class SceneObject;
 
-using ComponentCreatorFunc = std::function<std::unique_ptr<Component>(
-    const NeuronIDE::Component&, const std::shared_ptr<SceneObject>&)>;
+using ComponentCreatorFunc = std::function<std::unique_ptr<Component>(const NeuronIDE::Component&, const std::shared_ptr<SceneObject>&)>;
 
 class ComponentRegistry {
    public:
@@ -29,8 +28,7 @@ class ComponentRegistry {
 
     void registerCreator(int typeId, ComponentCreatorFunc creator);
 
-    std::unique_ptr<Component> build(const NeuronIDE::Component&         protoComp,
-                                     const std::shared_ptr<SceneObject>& owner);
+    std::unique_ptr<Component> build(const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner);
 
    private:
     ComponentRegistry() = default;
