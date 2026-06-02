@@ -7,6 +7,7 @@ add_library(runtime_core OBJECT
     scene/components/BlinkComponent.cpp
     scene/SceneObject.cpp
     scene/Scene.cpp
+    renderer/Renderer.cpp
     ${PROTO_SRCS} 
     ${PROTO_HDRS}
 )
