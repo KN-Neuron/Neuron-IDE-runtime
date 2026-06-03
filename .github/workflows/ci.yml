@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake clang-format clang-tidy libsdl2-dev protobuf-compiler
+        sudo apt-get install -y cmake clang-format clang-tidy-20 libsdl2-dev protobuf-compiler
 
     - name: Check Code Formatting
       run: |
