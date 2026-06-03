@@ -6,6 +6,7 @@ include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+  SYSTEM
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
@@ -15,6 +16,7 @@ FetchContent_Declare(
   liblsl
   GIT_REPOSITORY https://github.com/sccn/liblsl.git
   GIT_TAG v1.17.7
+  SYSTEM
 )
 set(LSL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(liblsl)
@@ -24,6 +26,7 @@ FetchContent_Declare(
   concurrentqueue
   GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
   GIT_TAG v1.0.4
+  SYSTEM
 )
 FetchContent_MakeAvailable(concurrentqueue)
 
