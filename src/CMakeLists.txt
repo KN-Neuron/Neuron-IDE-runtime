@@ -20,6 +20,8 @@ target_link_libraries(runtime_core PUBLIC
     renderer 
     datawriter
 )
+target_include_directories(runtime_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_link_libraries(runtime_core PUBLIC scene parser renderer)
 
 add_executable(NeuronIDE main.cpp)
 target_link_libraries(NeuronIDE PRIVATE runtime_core)
