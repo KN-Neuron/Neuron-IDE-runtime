@@ -3,6 +3,8 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/../proto
 add_library(runtime_core OBJECT
     Runtime.cpp
     parser/Parser.cpp
+    datawriter/CSVFormatStrategy.cpp
+    datawriter/DataWriter.cpp
     scene/components/ComponentRegistry.cpp
     scene/components/BlinkComponent.cpp
     scene/SceneObject.cpp
