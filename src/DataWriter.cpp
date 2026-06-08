@@ -1,4 +1,5 @@
 #include <DataWriter.hpp>
+#include <EEGData.hpp>
 #include <Marker.hpp>
 #include <chrono>
 #include <stdexcept>

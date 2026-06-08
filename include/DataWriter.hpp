@@ -3,8 +3,6 @@
 
 #include <concurrentqueue.h>
 
-#include <EEGData.hpp>
-
 class EEGData;
 class Marker;
 
