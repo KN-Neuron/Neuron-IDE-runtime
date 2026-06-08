@@ -1,25 +1,11 @@
 #include <DataWriter.hpp>
+#include <Marker.hpp>
 #include <chrono>
-#include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <utility>
 
-// anonymous namespace here for private utility-style definitions
-namespace {
 constexpr auto kWriteLoopSleep = std::chrono::milliseconds(10);
-
-std::string formatChannels(const std::vector<float>& channels) {
-    std::ostringstream stream;
-    for (std::size_t index = 0; index < channels.size(); ++index) {
-        if (index > 0) {
-            stream << ',';
-        }
-        stream << channels[index];
-    }
-    return stream.str();
-}
-}  // namespace
 
 DataWriter::~DataWriter() { stop(); }
 
@@ -38,7 +24,7 @@ void DataWriter::start(const std::string&                                    fil
     stopRequested.store(false);
 
     outputFile << "type,timestamp,payload\n";
-    writerThread = std::thread(&DataWriter::writeLoop, this);
+    writerThread = std::jthread(&DataWriter::writeLoop, this);
 }
 
 void DataWriter::stop() {
@@ -95,17 +81,16 @@ void DataWriter::writeLoop() {
 }
 
 void DataWriter::writeEEGData(const EEGData& data) {
-    if (!outputFile.is_open()) {
-        return;
+    outputFile << "eeg," << data.timestamp << ",\"";
+    for (std::size_t index = 0; index < data.channels.size(); ++index) {
+        if (index > 0) {
+            outputFile << ',';
+        }
+        outputFile << data.channels[index];
     }
-
-    outputFile << "eeg," << data.timestamp << ",\"" << formatChannels(data.channels) << '"' << '\n';
+    outputFile << '"' << '\n';
 }
 
 void DataWriter::writeMarker(const Marker& marker) {
-    if (!outputFile.is_open()) {
-        return;
-    }
-
     outputFile << "marker," << marker.timestamp << ",\"" << marker.eventName << '"' << '\n';
 }

@@ -1,10 +1,13 @@
 #ifndef DATAWRITER_HPP
 #define DATAWRITER_HPP
 
-#include <blockingconcurrentqueue.h>
+#include <concurrentqueue.h>
 
 #include <EEGData.hpp>
-#include <Marker.hpp>
+
+class EEGData;
+class Marker;
+
 #include <atomic>
 #include <fstream>
 #include <memory>
@@ -34,7 +37,7 @@ class DataWriter {
     std::ofstream                                         outputFile;
     std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>> eegQueue;
     std::shared_ptr<moodycamel::ConcurrentQueue<Marker>>  markerQueue;
-    std::thread                                           writerThread;
+    std::jthread                                          writerThread;
 
     std::atomic<bool> stopRequested{false};
 };
