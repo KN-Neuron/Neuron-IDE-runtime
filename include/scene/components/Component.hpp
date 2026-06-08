@@ -13,10 +13,10 @@ class Component {
     Component(std::shared_ptr<SceneObject> owner) : owner(owner) {}
     virtual ~Component() = default;
 
-    Component(const Component&)            = default;
-    Component(Component&&)                 = default;
-    Component& operator=(const Component&) = default;
-    Component& operator=(Component&&)      = default;
+    Component(const Component&)            = delete;
+    Component(Component&&)                 = delete;
+    Component& operator=(const Component&) = delete;
+    Component& operator=(Component&&)      = delete;
 
     virtual void update(const Context& context) = 0;
     virtual void render(SDL_Renderer* renderer) = 0;
