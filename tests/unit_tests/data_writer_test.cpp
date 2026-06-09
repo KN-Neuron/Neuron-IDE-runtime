@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <DataWriter.hpp>
+#include <EEGData.hpp>
+#include <Marker.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
