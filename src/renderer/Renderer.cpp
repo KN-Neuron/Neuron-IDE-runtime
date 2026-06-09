@@ -5,6 +5,20 @@
 #include "lsl_cpp.h"
 #include "scene/Scene.hpp"
 
+void Renderer::SDLWindowDeleter::operator()(SDL_Window* w) const {
+    if (w) {
+        SDL_DestroyWindow(w);
+    }
+}
+
+Renderer::Renderer(std::shared_ptr<Scene> scene, 
+                   std::shared_ptr<SDL_Renderer> sdlRenderer, 
+                   std::shared_ptr<moodycamel::ConcurrentQueue<Marker>> markerQueue)
+    : window(nullptr, SDLWindowDeleter{}),
+      sdlRenderer(std::move(sdlRenderer)),
+      currentScene(std::move(scene)),
+      markerQueue(std::move(markerQueue)) {}
+
 void Renderer::render(const std::stop_token& stoken) {
     std::vector<std::string> currentFrameMarkers;
     auto                     lastTime = std::chrono::high_resolution_clock::now();
