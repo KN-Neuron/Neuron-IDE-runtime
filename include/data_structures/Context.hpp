@@ -6,7 +6,7 @@
 
 struct Context {
     double                   timestamp;
-    std::vector<std::string> markers;
+    std::vector<std::string>& markers;
 };
 
 #endif  // CONTEXT_HPP
