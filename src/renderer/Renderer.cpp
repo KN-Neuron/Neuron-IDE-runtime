@@ -5,18 +5,17 @@
 #include "lsl_cpp.h"
 #include "scene/Scene.hpp"
 
-void Renderer::SDLWindowDeleter::operator()(SDL_Window* w) const {
-    if (w) {
-        SDL_DestroyWindow(w);
+void Renderer::SDLWindowDeleter::operator()(SDL_Window* window) const {
+    if (window) {
+        SDL_DestroyWindow(window);
     }
 }
 
-Renderer::Renderer(std::shared_ptr<Scene> scene, 
-                   std::shared_ptr<SDL_Renderer> sdlRenderer, 
+Renderer::Renderer(const std::shared_ptr<Scene>& scene, std::shared_ptr<SDL_Renderer> sdlRenderer,
                    std::shared_ptr<moodycamel::ConcurrentQueue<Marker>> markerQueue)
     : window(nullptr, SDLWindowDeleter{}),
       sdlRenderer(std::move(sdlRenderer)),
-      currentScene(std::move(scene)),
+      currentScene(scene),
       markerQueue(std::move(markerQueue)) {}
 
 void Renderer::render(const std::stop_token& stoken) {
