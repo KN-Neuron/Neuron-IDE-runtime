@@ -13,8 +13,7 @@ struct Marker;
 class Renderer {
    public:
     Renderer() = delete;
-    Renderer(std::shared_ptr<Scene> scene, 
-             std::shared_ptr<SDL_Renderer> sdlRenderer, 
+    Renderer(const std::shared_ptr<Scene>& scene, std::shared_ptr<SDL_Renderer> sdlRenderer,
              std::shared_ptr<moodycamel::ConcurrentQueue<Marker>> markerQueue);
     ~Renderer() = default;
 
@@ -22,7 +21,7 @@ class Renderer {
 
    private:
     struct SDLWindowDeleter {
-        void operator()(SDL_Window* w) const;
+        void operator()(SDL_Window* window) const;
     };
     std::unique_ptr<SDL_Window, SDLWindowDeleter>        window;
     std::shared_ptr<SDL_Renderer>                        sdlRenderer;
