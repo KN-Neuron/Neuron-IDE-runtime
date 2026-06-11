@@ -1,5 +1,6 @@
 #include <EEGData.hpp>
 #include <chrono>
+#include <datawriter/CSVFormatStrategy.hpp>
 #include <datawriter/DataWriter.hpp>
 #include <datawriter/IDataFormatStrategy.hpp>
 #include <datawriter/Marker.hpp>
@@ -8,6 +9,23 @@
 #include <utility>
 
 constexpr auto kWriteLoopSleep = std::chrono::milliseconds(10);
+
+template <typename QueueT, typename ItemT, typename WriteFn>
+bool drainQueue(const std::shared_ptr<QueueT>& queue, WriteFn&& writeFn) {
+    bool wroteData = false;
+
+    if (queue) {
+        ItemT item;
+        while (queue->try_dequeue(item)) {
+            writeFn(item);
+            wroteData = true;
+        }
+    }
+
+    return wroteData;
+}
+
+DataWriter::DataWriter() : formatStrategy(std::make_unique<CSVFormatStrategy>()) {}
 
 DataWriter::~DataWriter() { stop(); }
 
@@ -29,7 +47,7 @@ void DataWriter::start(const std::string&                                    fil
     this->markerQueue = std::move(markerQueue);
 
     formatStrategy->writeHeader(outputFile);
-    writerThread = std::jthread(&DataWriter::writeLoop, this);
+    writerThread = std::jthread([this](const std::stop_token& stopToken) { writeLoop(stopToken); });
 }
 
 void DataWriter::stop() {
@@ -49,40 +67,23 @@ void DataWriter::stop() {
 
 void DataWriter::writeLoop(const std::stop_token& stopToken) {
     while (!stopToken.stop_requested()) {
-        bool wroteData = false;
+        bool wroteData = drainQueue<moodycamel::ConcurrentQueue<EEGData>, EEGData>(
+            eegQueue,
+            [this](const EEGData& eegData) { formatStrategy->writeEEGData(outputFile, eegData); });
 
-        if (eegQueue) {
-            EEGData eegData;
-            while (eegQueue->try_dequeue(eegData)) {
-                formatStrategy->writeEEGData(outputFile, eegData);
-                wroteData = true;
-            }
-        }
-
-        if (markerQueue) {
-            Marker marker;
-            while (markerQueue->try_dequeue(marker)) {
-                formatStrategy->writeMarker(outputFile, marker);
-                wroteData = true;
-            }
-        }
+        wroteData |= drainQueue<moodycamel::ConcurrentQueue<Marker>, Marker>(
+            markerQueue,
+            [this](const Marker& marker) { formatStrategy->writeMarker(outputFile, marker); });
 
         if (!wroteData) {
             std::this_thread::sleep_for(kWriteLoopSleep);
         }
     }
 
-    if (eegQueue) {
-        EEGData eegData;
-        while (eegQueue->try_dequeue(eegData)) {
-            formatStrategy->writeEEGData(outputFile, eegData);
-        }
-    }
-
-    if (markerQueue) {
-        Marker marker;
-        while (markerQueue->try_dequeue(marker)) {
-            formatStrategy->writeMarker(outputFile, marker);
-        }
-    }
+    drainQueue<moodycamel::ConcurrentQueue<EEGData>, EEGData>(
+        eegQueue,
+        [this](const EEGData& eegData) { formatStrategy->writeEEGData(outputFile, eegData); });
+    drainQueue<moodycamel::ConcurrentQueue<Marker>, Marker>(
+        markerQueue,
+        [this](const Marker& marker) { formatStrategy->writeMarker(outputFile, marker); });
 }
