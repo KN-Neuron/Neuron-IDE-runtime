@@ -3,8 +3,9 @@
 
 #include <concurrentqueue.h>
 
+#include <datawriter/IDataFormatStrategy.hpp>
+
 class EEGData;
-class IDataFormatStrategy;
 class Marker;
 
 #include <fstream>
@@ -14,7 +15,7 @@ class Marker;
 
 class DataWriter {
    public:
-    DataWriter() = default;
+    DataWriter();
     ~DataWriter();
 
     DataWriter(const DataWriter&)            = delete;
