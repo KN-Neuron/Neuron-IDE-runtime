@@ -4,9 +4,9 @@
 #include <concurrentqueue.h>
 
 class EEGData;
+class IDataFormatStrategy;
 class Marker;
 
-#include <atomic>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -28,16 +28,13 @@ class DataWriter {
     void stop();
 
    private:
-    void writeLoop();
-    void writeEEGData(const EEGData& data);
-    void writeMarker(const Marker& marker);
+    void writeLoop(const std::stop_token& stopToken);
 
     std::ofstream                                         outputFile;
+    std::unique_ptr<IDataFormatStrategy>                  formatStrategy;
     std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>> eegQueue;
     std::shared_ptr<moodycamel::ConcurrentQueue<Marker>>  markerQueue;
     std::jthread                                          writerThread;
-
-    std::atomic<bool> stopRequested{false};
 };
 
 #endif  // DATAWRITER_HPP
