@@ -1,8 +1,8 @@
-#include <datawriter/DataWriter.hpp>
-
 #include <EEGData.hpp>
-#include <datawriter/Marker.hpp>
 #include <chrono>
+#include <datawriter/DataWriter.hpp>
+#include <datawriter/IDataFormatStrategy.hpp>
+#include <datawriter/Marker.hpp>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -16,6 +16,10 @@ void DataWriter::start(const std::string&                                    fil
                        std::shared_ptr<moodycamel::ConcurrentQueue<Marker>>  markerQueue) {
     stop();
 
+    if (!formatStrategy) {
+        throw std::runtime_error("No data format strategy set for DataWriter.");
+    }
+
     outputFile.open(filePath, std::ios::out | std::ios::trunc);
     if (!outputFile.is_open()) {
         throw std::runtime_error("Failed to open data writer output file: " + filePath);
@@ -23,14 +27,15 @@ void DataWriter::start(const std::string&                                    fil
 
     this->eegQueue    = std::move(eegQueue);
     this->markerQueue = std::move(markerQueue);
-    stopRequested.store(false);
 
-    outputFile << "type,timestamp,payload\n";
+    formatStrategy->writeHeader(outputFile);
     writerThread = std::jthread(&DataWriter::writeLoop, this);
 }
 
 void DataWriter::stop() {
-    stopRequested.store(true);
+    if (writerThread.joinable()) {
+        writerThread.request_stop();
+    }
 
     if (writerThread.joinable()) {
         writerThread.join();
@@ -42,14 +47,14 @@ void DataWriter::stop() {
     }
 }
 
-void DataWriter::writeLoop() {
-    while (!stopRequested.load()) {
+void DataWriter::writeLoop(const std::stop_token& stopToken) {
+    while (!stopToken.stop_requested()) {
         bool wroteData = false;
 
         if (eegQueue) {
             EEGData eegData;
             while (eegQueue->try_dequeue(eegData)) {
-                writeEEGData(eegData);
+                formatStrategy->writeEEGData(outputFile, eegData);
                 wroteData = true;
             }
         }
@@ -57,7 +62,7 @@ void DataWriter::writeLoop() {
         if (markerQueue) {
             Marker marker;
             while (markerQueue->try_dequeue(marker)) {
-                writeMarker(marker);
+                formatStrategy->writeMarker(outputFile, marker);
                 wroteData = true;
             }
         }
@@ -70,29 +75,14 @@ void DataWriter::writeLoop() {
     if (eegQueue) {
         EEGData eegData;
         while (eegQueue->try_dequeue(eegData)) {
-            writeEEGData(eegData);
+            formatStrategy->writeEEGData(outputFile, eegData);
         }
     }
 
     if (markerQueue) {
         Marker marker;
         while (markerQueue->try_dequeue(marker)) {
-            writeMarker(marker);
+            formatStrategy->writeMarker(outputFile, marker);
         }
     }
-}
-
-void DataWriter::writeEEGData(const EEGData& data) {
-    outputFile << "eeg," << data.timestamp << ",\"";
-    for (std::size_t index = 0; index < data.channels.size(); ++index) {
-        if (index > 0) {
-            outputFile << ',';
-        }
-        outputFile << data.channels[index];
-    }
-    outputFile << '"' << '\n';
-}
-
-void DataWriter::writeMarker(const Marker& marker) {
-    outputFile << "marker," << marker.timestamp << ",\"" << marker.eventName << '"' << '\n';
 }
