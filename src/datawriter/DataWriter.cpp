@@ -1,6 +1,7 @@
-#include <DataWriter.hpp>
+#include <datawriter/DataWriter.hpp>
+
 #include <EEGData.hpp>
-#include <Marker.hpp>
+#include <datawriter/Marker.hpp>
 #include <chrono>
 #include <stdexcept>
 #include <thread>
