@@ -14,7 +14,7 @@ FetchContent_MakeAvailable(googletest)
 FetchContent_Declare(
   liblsl
   GIT_REPOSITORY https://github.com/sccn/liblsl.git
-  GIT_TAG v1.16.2
+  GIT_TAG v1.17.7
 )
 set(LSL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(liblsl)
