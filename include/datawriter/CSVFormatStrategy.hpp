@@ -2,15 +2,23 @@
 #define CSVFORMATSTRATEGY_HPP
 
 #include <datawriter/IDataFormatStrategy.hpp>
+#include <fstream>
+#include <string>
 
 class CSVFormatStrategy : public IDataFormatStrategy {
    public:
-    CSVFormatStrategy()           = default;
-    ~CSVFormatStrategy() override = default;
+    CSVFormatStrategy() = default;
+    ~CSVFormatStrategy() override;
 
-    void writeHeader(std::ofstream& outputFile) const override;
-    void writeEEGData(std::ofstream& outputFile, const EEGData& data) const override;
-    void writeMarker(std::ofstream& outputFile, const Marker& marker) const override;
+    void open(const std::string& filepath) override;
+    void close() override;
+
+    void writeHeader() override;
+    void writeEEGData(const EEGData& data) override;
+    void writeMarker(const Marker& marker) override;
+
+   private:
+    std::ofstream outputFile;
 };
 
 #endif  // CSVFORMATSTRATEGY_HPP

@@ -5,7 +5,7 @@
 
 struct Marker {
     std::string name;
-    double      timestamp;
+    double      timestamp = 0.0;
 };
 
 #endif  // MARKER_HPP

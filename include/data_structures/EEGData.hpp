@@ -4,7 +4,7 @@
 #include <vector>
 
 struct EEGData {
-    double              timestamp;
+    double              timestamp = 0.0;
     std::vector<double> channelValues;
 };
 

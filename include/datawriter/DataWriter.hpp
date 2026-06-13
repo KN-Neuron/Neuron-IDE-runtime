@@ -8,14 +8,13 @@
 class EEGData;
 class Marker;
 
-#include <fstream>
 #include <memory>
 #include <string>
 #include <thread>
 
 class DataWriter {
    public:
-    DataWriter();
+    explicit DataWriter(std::unique_ptr<IDataFormatStrategy> strategy);
     ~DataWriter();
 
     DataWriter(const DataWriter&)            = delete;
@@ -31,7 +30,6 @@ class DataWriter {
    private:
     void writeLoop(const std::stop_token& stopToken);
 
-    std::ofstream                                         outputFile;
     std::unique_ptr<IDataFormatStrategy>                  formatStrategy;
     std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>> eegQueue;
     std::shared_ptr<moodycamel::ConcurrentQueue<Marker>>  markerQueue;
