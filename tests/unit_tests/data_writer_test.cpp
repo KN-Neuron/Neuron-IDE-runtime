@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <EEGData.hpp>
+#include <data_structures/EEGData.hpp>
 #include <chrono>
+#include <datawriter/CSVFormatStrategy.hpp>
 #include <datawriter/DataWriter.hpp>
-#include <datawriter/Marker.hpp>
+#include <data_structures/Marker.hpp>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -47,7 +48,7 @@ TEST(DataWriterTest, WritesCsvHeaderOnStart) {
     auto markerQueue = std::make_shared<moodycamel::ConcurrentQueue<Marker>>();
 
     {
-        DataWriter writer;
+        DataWriter writer(std::make_unique<CSVFormatStrategy>());
         writer.start(filePath.string(), eegQueue, markerQueue);
         writer.stop();
     }
@@ -69,7 +70,7 @@ TEST(DataWriterTest, FlushesEegAndMarkerRecords) {
     markerQueue->enqueue(Marker{"stimulus_on", kMarkerTimestamp});
 
     {
-        DataWriter writer;
+        DataWriter writer(std::make_unique<CSVFormatStrategy>());
         writer.start(filePath.string(), eegQueue, markerQueue);
         std::this_thread::sleep_for(kWriteWait);
         writer.stop();
