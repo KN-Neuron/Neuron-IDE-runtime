@@ -30,10 +30,10 @@ FetchContent_Declare(
 # Suppress compiler warnings from third-party targets when compiling their source files
 set(BACKUP_C_FLAGS "${CMAKE_C_FLAGS}")
 set(BACKUP_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
-elseif(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /w")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /w")
 endif()
