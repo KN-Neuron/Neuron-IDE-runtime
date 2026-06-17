@@ -4,7 +4,7 @@
 #include <string>
 
 struct Marker {
-    std::string name;
+    std::string eventName;
     double      timestamp = 0.0;
 };
 

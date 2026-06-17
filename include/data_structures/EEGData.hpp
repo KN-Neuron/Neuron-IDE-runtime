@@ -5,7 +5,7 @@
 
 struct EEGData {
     double              timestamp = 0.0;
-    std::vector<double> channelValues;
+    std::vector<double> channels;
 };
 
 #endif  // EEGDATA_HPP
