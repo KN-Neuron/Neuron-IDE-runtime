@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <data_structures/EEGData.hpp>
 #include <chrono>
+#include <data_structures/EEGData.hpp>
+#include <data_structures/Marker.hpp>
 #include <datawriter/CSVFormatStrategy.hpp>
 #include <datawriter/DataWriter.hpp>
-#include <data_structures/Marker.hpp>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -66,7 +66,7 @@ TEST(DataWriterTest, FlushesEegAndMarkerRecords) {
     auto eegQueue    = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
     auto markerQueue = std::make_shared<moodycamel::ConcurrentQueue<Marker>>();
 
-    eegQueue->enqueue(EEGData{{kChannelOne, kChannelTwo, kChannelThree}, kEegTimestamp});
+    eegQueue->enqueue(EEGData{kEegTimestamp, {kChannelOne, kChannelTwo, kChannelThree}});
     markerQueue->enqueue(Marker{"stimulus_on", kMarkerTimestamp});
 
     {

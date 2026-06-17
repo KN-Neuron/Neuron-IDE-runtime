@@ -1,6 +1,6 @@
 #include <data_structures/EEGData.hpp>
-#include <datawriter/CSVFormatStrategy.hpp>
 #include <data_structures/Marker.hpp>
+#include <datawriter/CSVFormatStrategy.hpp>
 #include <stdexcept>
 
 CSVFormatStrategy::~CSVFormatStrategy() { close(); }
@@ -19,9 +19,7 @@ void CSVFormatStrategy::close() {
     }
 }
 
-void CSVFormatStrategy::writeHeader() {
-    outputFile << "type,timestamp,payload\n";
-}
+void CSVFormatStrategy::writeHeader() { outputFile << "type,timestamp,payload\n"; }
 
 void CSVFormatStrategy::writeEEGData(const EEGData& data) {
     outputFile << "eeg," << data.timestamp << ",\"";
