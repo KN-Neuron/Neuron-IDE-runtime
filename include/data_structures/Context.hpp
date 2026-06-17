@@ -5,7 +5,7 @@
 #include <vector>
 
 struct Context {
-    double                    timestamp;
+    double                    timestamp = 0.0;
     std::vector<std::string>& markers;
 };
 

@@ -133,7 +133,7 @@ TEST(RendererTest, RenderLoop_QueuesMarkersFromComponents) {
     bool   dequeued = markerQueue->try_dequeue(m);
     EXPECT_TRUE(dequeued);
     if (dequeued) {
-        EXPECT_EQ(m.name, "test_marker");
+        EXPECT_EQ(m.eventName, "test_marker");
         EXPECT_FALSE(markerQueue->try_dequeue(m));
     }
 
