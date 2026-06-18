@@ -11,6 +11,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Dependencies)
 include(CompilerWarnings)
 include(StaticAnalysis)
+include(Coverage)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 

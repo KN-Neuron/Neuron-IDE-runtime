@@ -17,18 +17,17 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake clang-format clang-tidy-20 libsdl2-dev protobuf-compiler
+        sudo apt-get install -y cmake clang-format clang-tidy-20 libsdl2-dev protobuf-compiler gcovr
 
     - name: Check Code Formatting
       run: |
         find src include tests -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" -o -name "*.h" \) | xargs clang-format --dry-run -Werror
 
     - name: Configure CMake
-      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DNEURON_IDE_ENABLE_COVERAGE=ON
 
     - name: Build
       run: cmake --build build --config Release
 
-    - name: Run Tests
-      working-directory: build
-      run: ctest --output-on-failure -C Release
+    - name: Run Tests & Check Coverage
+      run: cmake --build build --target coverage
