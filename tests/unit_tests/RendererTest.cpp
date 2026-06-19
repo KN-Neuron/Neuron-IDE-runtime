@@ -19,9 +19,10 @@ constexpr uint32_t kDummySurfaceFlags  = 0;
 
 class CustomComponent : public Component {
    public:
-    CustomComponent(const std::shared_ptr<SceneObject>& owner, std::shared_ptr<std::atomic<int>> updates,
-                    std::shared_ptr<std::atomic<int>> renders,
-                    std::shared_ptr<std::stop_source> stopSource)
+    CustomComponent(const std::shared_ptr<SceneObject>& owner,
+                    std::shared_ptr<std::atomic<int>>   updates,
+                    std::shared_ptr<std::atomic<int>>   renders,
+                    std::shared_ptr<std::stop_source>   stopSource)
         : Component(owner),
           updates(std::move(updates)),
           renders(std::move(renders)),
@@ -48,7 +49,7 @@ class CustomComponent : public Component {
 class MarkerComponent : public Component {
    public:
     MarkerComponent(const std::shared_ptr<SceneObject>& owner,
-                    std::shared_ptr<std::stop_source> stopSource)
+                    std::shared_ptr<std::stop_source>   stopSource)
         : Component(owner), stopSource(std::move(stopSource)) {}
 
     void update(const Context& context) override {
@@ -83,14 +84,15 @@ TEST(RendererTest, RenderLoop_WhenComponentAdded_CallsUpdateExactlyOnceBeforeSto
         SDL_CreateRGBSurfaceWithFormat(kDummySurfaceFlags, kDummySurfaceWidth, kDummySurfaceHeight,
                                        kDummySurfaceDepth, SDL_PIXELFORMAT_RGBA32);
     SDL_Renderer* sdlRenderer = SDL_CreateSoftwareRenderer(surface);
-    auto sharedRenderer = std::shared_ptr<SDL_Renderer>(sdlRenderer, [surface](SDL_Renderer* renderer) {
-        if (renderer) {
-            SDL_DestroyRenderer(renderer);
-        }
-        if (surface) {
-            SDL_FreeSurface(surface);
-        }
-    });
+    auto          sharedRenderer =
+        std::shared_ptr<SDL_Renderer>(sdlRenderer, [surface](SDL_Renderer* renderer) {
+            if (renderer) {
+                SDL_DestroyRenderer(renderer);
+            }
+            if (surface) {
+                SDL_FreeSurface(surface);
+            }
+        });
 
     auto markerQueue = std::make_shared<moodycamel::ConcurrentQueue<Marker>>();
 
@@ -117,14 +119,15 @@ TEST(RendererTest, RenderLoop_QueuesMarkersFromComponents) {
         SDL_CreateRGBSurfaceWithFormat(kDummySurfaceFlags, kDummySurfaceWidth, kDummySurfaceHeight,
                                        kDummySurfaceDepth, SDL_PIXELFORMAT_RGBA32);
     SDL_Renderer* sdlRenderer = SDL_CreateSoftwareRenderer(surface);
-    auto sharedRenderer = std::shared_ptr<SDL_Renderer>(sdlRenderer, [surface](SDL_Renderer* renderer) {
-        if (renderer) {
-            SDL_DestroyRenderer(renderer);
-        }
-        if (surface) {
-            SDL_FreeSurface(surface);
-        }
-    });
+    auto          sharedRenderer =
+        std::shared_ptr<SDL_Renderer>(sdlRenderer, [surface](SDL_Renderer* renderer) {
+            if (renderer) {
+                SDL_DestroyRenderer(renderer);
+            }
+            if (surface) {
+                SDL_FreeSurface(surface);
+            }
+        });
 
     auto markerQueue = std::make_shared<moodycamel::ConcurrentQueue<Marker>>();
 
