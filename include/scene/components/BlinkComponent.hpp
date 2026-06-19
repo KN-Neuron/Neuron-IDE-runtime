@@ -11,7 +11,7 @@ class Component;
 
 class BlinkComponent : public Component {
    public:
-    BlinkComponent(std::shared_ptr<SceneObject> owner, double freq)
+    BlinkComponent(const std::shared_ptr<SceneObject>& owner, double freq)
         : Component(owner), blinkFrequencyHz(freq) {}
     void setFrequency(double freq);
 

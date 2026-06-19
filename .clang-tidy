@@ -1,5 +1,5 @@
 Checks: 'bugprone-*,cppcoreguidelines-*,performance-*,readability-*,-cppcoreguidelines-avoid-magic-numbers,-cppcoreguidelines-pro-bounds-array-to-pointer-decay'
-WarningsAsErrors: ''
+WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'
 ExcludeHeaderFilterRegex: '(_deps|\.pb\.h|\.pb\.cc|/usr/)'
 FormatStyle: 'file'

@@ -17,6 +17,11 @@ class Renderer {
              std::shared_ptr<moodycamel::ConcurrentQueue<Marker>> markerQueue);
     ~Renderer() = default;
 
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
+    Renderer(Renderer&&) = delete;
+    Renderer& operator=(Renderer&&) = delete;
+
     void render(const std::stop_token& stoken);
 
    private:
