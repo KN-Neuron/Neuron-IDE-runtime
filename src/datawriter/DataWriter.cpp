@@ -9,7 +9,7 @@
 constexpr auto kWriteLoopSleep = std::chrono::milliseconds(10);
 
 template <typename QueueT, typename ItemT, typename WriteFn>
-bool drainQueue(const std::shared_ptr<QueueT>& queue, WriteFn&& writeFn) {
+bool drainQueue(const std::shared_ptr<QueueT>& queue, WriteFn writeFn) {
     bool wroteData = false;
 
     if (queue) {

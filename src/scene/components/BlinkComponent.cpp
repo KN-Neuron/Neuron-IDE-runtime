@@ -11,10 +11,12 @@ std::unique_ptr<Component> BlinkComponent::createBlinker(
 }
 
 void BlinkComponent::update(const Context& context) {
+    (void)context;
     // TODO: implement blinking logic based on blinkFrequencyHz and context.timestamp
 }
 
 void BlinkComponent::render(SDL_Renderer* renderer) {
+    (void)renderer;
     // This component does not render anything itself, it only controls visibility of the owner
     // object.
 }

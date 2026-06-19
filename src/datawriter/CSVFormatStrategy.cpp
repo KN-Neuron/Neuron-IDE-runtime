@@ -3,7 +3,7 @@
 #include <datawriter/CSVFormatStrategy.hpp>
 #include <stdexcept>
 
-CSVFormatStrategy::~CSVFormatStrategy() { close(); }
+CSVFormatStrategy::~CSVFormatStrategy() { CSVFormatStrategy::close(); }
 
 void CSVFormatStrategy::open(const std::string& filepath) {
     outputFile.open(filepath, std::ios::out | std::ios::trunc);

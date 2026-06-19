@@ -10,7 +10,7 @@ struct Context;
 class Component {
    public:
     Component() = delete;
-    Component(std::shared_ptr<SceneObject> owner) : owner(owner) {}
+    Component(const std::shared_ptr<SceneObject>& owner) : owner(owner) {}
     virtual ~Component() = default;
 
     Component(const Component&)            = delete;
@@ -22,6 +22,7 @@ class Component {
     virtual void render(SDL_Renderer* renderer) = 0;
 
    protected:
+    // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
     std::weak_ptr<SceneObject> owner;
 };
 

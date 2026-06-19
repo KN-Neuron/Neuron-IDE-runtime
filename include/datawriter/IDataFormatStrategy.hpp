@@ -3,7 +3,7 @@
 
 #include <string>
 
-class EEGData;
+struct EEGData;
 struct Marker;
 
 class IDataFormatStrategy {
