@@ -19,6 +19,7 @@ class Parser {
     Parser() = default;
 
     static std::shared_ptr<Scene> parse(const std::string& filePath);
+    static std::shared_ptr<Scene> parseStream(std::istream& stream);
 
    private:
     static std::shared_ptr<SceneObject> buildSceneObject(const NeuronIDE::SceneObject& protoObj);
