@@ -22,14 +22,14 @@ std::string writeTempProto(const NeuronIDE::Scene& scene, const std::string& fil
     return path;
 }
 
-NeuronIDE::Scene buildSimpleScene(const std::string& projectName    = "TestProject",
-                                  const std::string& objectName     = "ObiektA",
-                                  bool               isVisible      = true,
-                                  double             blinkFrequency = 1.5) {
-    NeuronIDE::Scene scene;
-    scene.set_project_name(projectName);
+NeuronIDE::Scene buildSimpleScene(const std::string& projectName = "TestProject",
+                                  const std::string& objectName = "ObiektA", bool isVisible = true,
+                                  double blinkFrequency = 1.5) {
+                                  NeuronIDE::Scene scene;
+                                  scene.set_project_name(projectName
+                                );
 
-    auto* obj     = scene.add_scene_objects();
+    auto* obj = scene.add_scene_objects();
     obj->set_name(objectName);
     obj->set_is_visible(isVisible);
 
@@ -42,16 +42,14 @@ NeuronIDE::Scene buildSimpleScene(const std::string& projectName    = "TestProje
 
 }  // namespace
 
-
 //  Grupa: Parser -- otwieranie pliku
 TEST(ParserFileTest, ThrowsWhenFileDoesNotExist) {
     Parser parser;
     EXPECT_THROW(parser.parse("/nonexistent/path/scene.pb"), std::runtime_error);
 }
 
-
 TEST(ParserFileTest, ReturnsNonNullSceneForValidFile) {
-    auto          scene = buildSimpleScene();
+    auto  scene = buildSimpleScene();
     const std::string path  = writeTempProto(scene, "valid_scene.pb");
 
     Parser parser;
@@ -59,10 +57,9 @@ TEST(ParserFileTest, ReturnsNonNullSceneForValidFile) {
     ASSERT_NE(result, nullptr);
 }
 
-
 //  Grupa: Parser -- nazwa projektu (Scene.project_name)
 TEST(ParserSceneNameTest, SetsProjectName) {
-    auto          scene = buildSimpleScene("MojProjekt");
+    auto  scene = buildSimpleScene("MojProjekt");
     const std::string path  = writeTempProto(scene, "name_test.pb");
 
     Parser parser;
@@ -71,14 +68,13 @@ TEST(ParserSceneNameTest, SetsProjectName) {
 }
 
 TEST(ParserSceneNameTest, EmptyProjectNameIsPreserved) {
-    auto          scene = buildSimpleScene("");
+    auto  scene = buildSimpleScene("");
     const std::string path  = writeTempProto(scene, "empty_name.pb");
 
     Parser parser;
     auto   result = parser.parse(path);
     EXPECT_EQ(result->getExperimentName(), "");
 }
-
 
 //  Grupa: Parser -- liczba obiektow sceny
 TEST(ParserObjectCountTest, EmptySceneHasNoObjects) {
@@ -91,7 +87,7 @@ TEST(ParserObjectCountTest, EmptySceneHasNoObjects) {
 }
 
 TEST(ParserObjectCountTest, SingleObjectIsLoaded) {
-    auto          scene = buildSimpleScene("P", "Obj1");
+    auto  scene = buildSimpleScene("P", "Obj1");
     const std::string path  = writeTempProto(scene, "one_object.pb");
 
     Parser parser;
@@ -116,10 +112,9 @@ TEST(ParserObjectCountTest, MultipleObjectsAreAllLoaded) {
     EXPECT_EQ(result->getObjects().size(), 5u);
 }
 
-
 //  Grupa: Parser -- atrybuty SceneObject
 TEST(ParserSceneObjectTest, ObjectNameIsCorrect) {
-    auto          scene = buildSimpleScene("P", "MojaRakieta");
+    auto  scene = buildSimpleScene("P", "MojaRakieta");
     const std::string path  = writeTempProto(scene, "obj_name.pb");
 
     Parser parser;
@@ -128,7 +123,7 @@ TEST(ParserSceneObjectTest, ObjectNameIsCorrect) {
 }
 
 TEST(ParserSceneObjectTest, ObjectIsVisibleWhenTrue) {
-    auto          scene = buildSimpleScene("P", "Obj", true);
+    auto   scene = buildSimpleScene("P", "Obj", true);
     const std::string path  = writeTempProto(scene, "obj_visible_true.pb");
 
     Parser parser;
@@ -137,7 +132,7 @@ TEST(ParserSceneObjectTest, ObjectIsVisibleWhenTrue) {
 }
 
 TEST(ParserSceneObjectTest, ObjectIsHiddenWhenFalse) {
-    auto          scene = buildSimpleScene("P", "Obj", false);
+    auto   scene = buildSimpleScene("P", "Obj", false);
     const std::string path  = writeTempProto(scene, "obj_visible_false.pb");
 
     Parser parser;
@@ -162,7 +157,6 @@ TEST(ParserSceneObjectTest, ObjectsPreserveInsertionOrder) {
         EXPECT_EQ(result->getObjects()[i]->name, names[i]);
     }
 }
-
 
 //  Grupa: Parser -- Transform
 TEST(ParserTransformTest, TransformFieldsAreParsedCorrectly) {
@@ -227,14 +221,13 @@ TEST(ParserTransformTest, NegativeTransformValuesAreAccepted) {
 
     const std::string path = writeTempProto(scene, "neg_transform.pb");
 
-    Parser parser;
-    auto   result = parser.parse(path);
-    const auto& t = result->getObjects()[0]->transform;
+    Parser      parser;
+    auto        result = parser.parse(path);
+    const auto& t      = result->getObjects()[0]->transform;
     EXPECT_DOUBLE_EQ(t.posX, -50.0);
     EXPECT_DOUBLE_EQ(t.posY, -100.0);
     EXPECT_DOUBLE_EQ(t.rotation, -90.0);
 }
-
 
 //  Grupa: Parser -- komponenty (BlinkComponent)
 TEST(ParserComponentTest, ObjectWithNoComponentsHasEmptyComponentList) {
@@ -251,7 +244,7 @@ TEST(ParserComponentTest, ObjectWithNoComponentsHasEmptyComponentList) {
 }
 
 TEST(ParserComponentTest, BlinkComponentIsCreated) {
-    auto          scene = buildSimpleScene("P", "Mrugacz", true, 2.0);
+    auto  scene = buildSimpleScene("P", "Mrugacz", true, 2.0);
     const std::string path  = writeTempProto(scene, "blink_comp.pb");
 
     Parser parser;
@@ -262,7 +255,7 @@ TEST(ParserComponentTest, BlinkComponentIsCreated) {
 }
 
 TEST(ParserComponentTest, BlinkComponentIsCorrectType) {
-    auto          scene = buildSimpleScene("P", "Blinker", true, 3.0);
+    auto  scene = buildSimpleScene("P", "Blinker", true, 3.0);
     const std::string path  = writeTempProto(scene, "blink_type.pb");
 
     Parser parser;
@@ -309,7 +302,8 @@ TEST(ParserComponentTest, MultipleObjectsEachHaveTheirOwnComponents) {
         auto* obj = scene.add_scene_objects();
         obj->set_name("Obj" + std::to_string(i));
         obj->set_is_visible(true);
-        obj->add_components()->mutable_blinker()->set_blink_frequency_hz(static_cast<double>(i + 1));
+        obj->add_components()->mutable_blinker()->set_blink_frequency_hz(
+            static_cast<double>(i + 1));
     }
     const std::string path = writeTempProto(scene, "indep_comp.pb");
 
@@ -319,7 +313,6 @@ TEST(ParserComponentTest, MultipleObjectsEachHaveTheirOwnComponents) {
         EXPECT_EQ(obj->components.size(), 1u);
     }
 }
-
 
 //  Grupa: Parser -- scenariusze brzegowe
 TEST(ParserEdgeCaseTest, ObjectWithEmptyNameIsParsed) {
@@ -355,7 +348,7 @@ TEST(ParserEdgeCaseTest, LargeNumberOfObjectsIsHandled) {
 }
 
 TEST(ParserEdgeCaseTest, BlinkFrequencyZeroIsValid) {
-    auto          scene = buildSimpleScene("P", "ZeroHz", true, 0.0);
+    auto  scene = buildSimpleScene("P", "ZeroHz", true, 0.0);
     const std::string path  = writeTempProto(scene, "zero_freq.pb");
 
     Parser parser;
@@ -365,7 +358,7 @@ TEST(ParserEdgeCaseTest, BlinkFrequencyZeroIsValid) {
 }
 
 TEST(ParserEdgeCaseTest, ParseReturnsDifferentObjectEachCall) {
-    auto          scene = buildSimpleScene();
+    auto  scene = buildSimpleScene();
     const std::string path  = writeTempProto(scene, "two_calls.pb");
 
     Parser parser;
