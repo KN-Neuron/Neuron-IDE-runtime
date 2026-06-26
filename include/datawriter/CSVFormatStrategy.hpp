@@ -10,6 +10,11 @@ class CSVFormatStrategy : public IDataFormatStrategy {
     CSVFormatStrategy() = default;
     ~CSVFormatStrategy() override;
 
+    CSVFormatStrategy(const CSVFormatStrategy&)            = delete;
+    CSVFormatStrategy& operator=(const CSVFormatStrategy&) = delete;
+    CSVFormatStrategy(CSVFormatStrategy&&)                 = delete;
+    CSVFormatStrategy& operator=(CSVFormatStrategy&&)      = delete;
+
     void open(const std::string& filepath) override;
     void close() override;
 

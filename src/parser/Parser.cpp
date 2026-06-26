@@ -46,7 +46,7 @@ std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObje
     for (const auto& protoComp : protoObj.components()) {
         int typeId = static_cast<int>(protoComp.component_type_case());
 
-        if (seenComponentTypes.find(typeId) != seenComponentTypes.end()) {
+        if (seenComponentTypes.contains(typeId)) {
             throw std::runtime_error("Parser: duplicate component type in object '" +
                                      protoObj.name() + "'.");
         }

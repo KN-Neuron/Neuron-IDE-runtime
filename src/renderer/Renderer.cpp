@@ -6,7 +6,7 @@
 #include "scene/Scene.hpp"
 
 void Renderer::SDLWindowDeleter::operator()(SDL_Window* window) const {
-    if (window) {
+    if (window != nullptr) {
         SDL_DestroyWindow(window);
     }
 }
@@ -28,7 +28,7 @@ void Renderer::render(const std::stop_token& stoken) {
         lastTime           = currentTime;
 
         currentFrameMarkers.clear();
-        Context ctx{deltaTime, currentFrameMarkers};
+        Context ctx{deltaTime, &currentFrameMarkers};
 
         SDL_Event event;
         while (SDL_PollEvent(&event) == 1) {

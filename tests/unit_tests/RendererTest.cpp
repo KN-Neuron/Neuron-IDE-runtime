@@ -19,10 +19,11 @@ constexpr uint32_t kDummySurfaceFlags  = 0;
 
 class CustomComponent : public Component {
    public:
-    CustomComponent(std::shared_ptr<SceneObject> owner, std::shared_ptr<std::atomic<int>> updates,
-                    std::shared_ptr<std::atomic<int>> renders,
-                    std::shared_ptr<std::stop_source> stopSource)
-        : Component(std::move(owner)),
+    CustomComponent(const std::shared_ptr<SceneObject>& owner,
+                    std::shared_ptr<std::atomic<int>>   updates,
+                    std::shared_ptr<std::atomic<int>>   renders,
+                    std::shared_ptr<std::stop_source>   stopSource)
+        : Component(owner),
           updates(std::move(updates)),
           renders(std::move(renders)),
           stopSource(std::move(stopSource)) {}
@@ -47,12 +48,14 @@ class CustomComponent : public Component {
 
 class MarkerComponent : public Component {
    public:
-    MarkerComponent(std::shared_ptr<SceneObject>      owner,
-                    std::shared_ptr<std::stop_source> stopSource)
-        : Component(std::move(owner)), stopSource(std::move(stopSource)) {}
+    MarkerComponent(const std::shared_ptr<SceneObject>& owner,
+                    std::shared_ptr<std::stop_source>   stopSource)
+        : Component(owner), stopSource(std::move(stopSource)) {}
 
     void update(const Context& context) override {
-        context.markers.push_back("test_marker");
+        if (context.markers != nullptr) {
+            context.markers->push_back("test_marker");
+        }
         stopSource->request_stop();
     }
 
@@ -81,14 +84,15 @@ TEST(RendererTest, RenderLoop_WhenComponentAdded_CallsUpdateExactlyOnceBeforeSto
         SDL_CreateRGBSurfaceWithFormat(kDummySurfaceFlags, kDummySurfaceWidth, kDummySurfaceHeight,
                                        kDummySurfaceDepth, SDL_PIXELFORMAT_RGBA32);
     SDL_Renderer* sdlRenderer = SDL_CreateSoftwareRenderer(surface);
-    auto sharedRenderer = std::shared_ptr<SDL_Renderer>(sdlRenderer, [surface](SDL_Renderer* r) {
-        if (r) {
-            SDL_DestroyRenderer(r);
-        }
-        if (surface) {
-            SDL_FreeSurface(surface);
-        }
-    });
+    auto          sharedRenderer =
+        std::shared_ptr<SDL_Renderer>(sdlRenderer, [surface](SDL_Renderer* renderer) {
+            if (renderer) {
+                SDL_DestroyRenderer(renderer);
+            }
+            if (surface) {
+                SDL_FreeSurface(surface);
+            }
+        });
 
     auto markerQueue = std::make_shared<moodycamel::ConcurrentQueue<Marker>>();
 
@@ -115,26 +119,27 @@ TEST(RendererTest, RenderLoop_QueuesMarkersFromComponents) {
         SDL_CreateRGBSurfaceWithFormat(kDummySurfaceFlags, kDummySurfaceWidth, kDummySurfaceHeight,
                                        kDummySurfaceDepth, SDL_PIXELFORMAT_RGBA32);
     SDL_Renderer* sdlRenderer = SDL_CreateSoftwareRenderer(surface);
-    auto sharedRenderer = std::shared_ptr<SDL_Renderer>(sdlRenderer, [surface](SDL_Renderer* r) {
-        if (r) {
-            SDL_DestroyRenderer(r);
-        }
-        if (surface) {
-            SDL_FreeSurface(surface);
-        }
-    });
+    auto          sharedRenderer =
+        std::shared_ptr<SDL_Renderer>(sdlRenderer, [surface](SDL_Renderer* renderer) {
+            if (renderer) {
+                SDL_DestroyRenderer(renderer);
+            }
+            if (surface) {
+                SDL_FreeSurface(surface);
+            }
+        });
 
     auto markerQueue = std::make_shared<moodycamel::ConcurrentQueue<Marker>>();
 
     Renderer renderer(scene, sharedRenderer, markerQueue);
     renderer.render(stop_source->get_token());
 
-    Marker m;
-    bool   dequeued = markerQueue->try_dequeue(m);
+    Marker marker;
+    bool   dequeued = markerQueue->try_dequeue(marker);
     EXPECT_TRUE(dequeued);
     if (dequeued) {
-        EXPECT_EQ(m.eventName, "test_marker");
-        EXPECT_FALSE(markerQueue->try_dequeue(m));
+        EXPECT_EQ(marker.eventName, "test_marker");
+        EXPECT_FALSE(markerQueue->try_dequeue(marker));
     }
 
     SDL_Quit();

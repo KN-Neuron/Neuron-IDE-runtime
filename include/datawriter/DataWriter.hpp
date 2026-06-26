@@ -5,8 +5,8 @@
 
 #include <datawriter/IDataFormatStrategy.hpp>
 
-class EEGData;
-class Marker;
+struct EEGData;
+struct Marker;
 
 #include <memory>
 #include <string>

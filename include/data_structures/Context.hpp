@@ -6,7 +6,7 @@
 
 struct Context {
     double                    timestamp = 0.0;
-    std::vector<std::string>& markers;
+    std::vector<std::string>* markers   = nullptr;
 };
 
 #endif  // CONTEXT_HPP
