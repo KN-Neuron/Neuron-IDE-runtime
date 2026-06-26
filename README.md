@@ -196,8 +196,7 @@ stream rather than letting an exception terminate the process.
 | `Scene` / `SceneObject`     | Implemented   | component containers                                          |
 | `Component` (base)          | Implemented   | abstract `update` / `render`                                 |
 | `ComponentRegistry`         | Implemented   | proto-type → factory, macro-based self-registration          |
-| `BlinkComponent`            | Implemented   | SSVEP flicker                                                 |
-| `SpriteRenderer` / `TextRenderer` / `ScriptComponent` | **Planned** | defined in `neuronide.proto`, not yet implemented in C++     |
+| `specifiic components` | **Planned** | defined in `neuronide.proto`, not yet implemented in C++     |
 | `Renderer`                  | Implemented   | SDL + vsync, marker timestamping                             |
 | `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4)                |
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
@@ -209,28 +208,25 @@ the actual code.
 ## 7. Repository layout
 
 ```
-neuronide/
-├── README.md                 # this file (project context)
-├── requirements.md           # tooling notes, conventions (PL)
-├── ROADMAP.md                # per-component milestones (PL)
-└── Neuron-IDE-runtime/       # the C++ runtime (git repo)
-    ├── CMakeLists.txt        # top-level: deps, warnings, static analysis, coverage
-    ├── cmake/                # Dependencies / CompilerWarnings / StaticAnalysis / Coverage
-    ├── protoFiles/
-    │   ├── neuronide.proto   # experiment file schema
-    │   └── tests/            # .pbtxt fixtures + compiled .pb
-    ├── include/              # public headers, mirrored by src/
-    │   ├── data_structures/  # EEGData, Marker, Context
-    │   ├── parser/           # Parser
-    │   ├── scene/            # Scene, SceneObject, components/
-    │   ├── renderer/         # Renderer
-    │   ├── lslreader/        # LSLReader
-    │   ├── datawriter/       # DataWriter, IDataFormatStrategy, CSVFormatStrategy
-    │   └── Runtime.hpp
-    ├── src/                  # one CMake subdirectory (static lib) per module
-    └── tests/
-        ├── unit_tests/       # CTest label: "unit"
-        └── component_tests/  # CTest label: "component"
+Neuron-IDE-runtime/       # the C++ runtime (git repo)
+  ├── README.md             # this file, code context
+  ├── CMakeLists.txt        # top-level: deps, warnings, static analysis, coverage
+  ├── cmake/                # Dependencies / CompilerWarnings / StaticAnalysis / Coverage
+  ├── protoFiles/
+  │   ├── neuronide.proto   # experiment file schema
+  │   └── tests/            # .pbtxt fixtures + compiled .pb
+  ├── include/              # public headers, mirrored by src/
+  │   ├── data_structures/  # EEGData, Marker, Context
+  │   ├── parser/           # Parser
+  │   ├── scene/            # Scene, SceneObject, components/
+  │   ├── renderer/         # Renderer
+  │   ├── lslreader/        # LSLReader
+  │   ├── datawriter/       # DataWriter, IDataFormatStrategy, CSVFormatStrategy
+  │   └── Runtime.hpp
+  ├── src/                  # one CMake subdirectory (static lib) per module
+  └── tests/
+      ├── unit_tests/       # CTest label: "unit"
+      └── component_tests/  # CTest label: "component"
 ```
 
 Each `src/<module>/` builds a static library; `runtime_core` links them together
