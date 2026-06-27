@@ -22,7 +22,7 @@ TEST(ParserSceneNameTest, SetsProjectName) {
 
 TEST(ParserSceneNameTest, EmptyProjectNameThrowsError) {
     auto scene = utils::buildSimpleScene("");
-    EXPECT_THROW({ utils::parseProtoScene(scene); }, std::invalid_argument);
+    EXPECT_THROW(utils::parseProtoScene(scene), std::invalid_argument);
 }
 
 //  Grupa: Parser -- liczba obiektow sceny
@@ -227,7 +227,7 @@ TEST(ParserEdgeCaseTest, ObjectWithEmptyNameThrowsError) {
     obj->set_name("");
     obj->set_is_visible(true);
 
-    EXPECT_THROW({utils::parseProtoScene(scene)}, std::invalid_argument);
+    EXPECT_THROW(utils::parseProtoScene(scene), std::invalid_argument);
 }
 
 TEST(ParserEdgeCaseTest, LargeNumberOfObjectsIsHandled) {
