@@ -20,10 +20,9 @@ TEST(ParserSceneNameTest, SetsProjectName) {
     EXPECT_EQ(result->getExperimentName(), "MojProjekt");
 }
 
-TEST(ParserSceneNameTest, EmptyProjectNameIsPreserved) {
-    auto scene  = utils::buildSimpleScene("");
-    auto result = utils::parseProtoScene(scene);
-    EXPECT_EQ(result->getExperimentName(), "");
+TEST(ParserSceneNameTest, EmptyProjectNameThrowsError) {
+    auto scene = utils::buildSimpleScene("");
+    EXPECT_THROW({ utils::parseProtoScene(scene); }, std::invalid_argument);
 }
 
 //  Grupa: Parser -- liczba obiektow sceny
@@ -42,13 +41,13 @@ TEST(ParserObjectCountTest, SingleObjectIsLoaded) {
 TEST(ParserObjectCountTest, MultipleObjectsAreAllLoaded) {
     NeuronIDE::Scene scene;
     scene.set_project_name("Multi");
+
     for (int i = 0; i < 5; ++i) {
         auto* obj = scene.add_scene_objects();
         obj->set_name("Obj" + std::to_string(i));
         obj->set_is_visible(true);
-        auto* comp = obj->add_components();
-        comp->mutable_blinker()->set_blink_frequency_hz(static_cast<double>(i));
     }
+
     auto result = utils::parseProtoScene(scene);
     EXPECT_EQ(result->getObjects().size(), 5u);
 }
@@ -221,16 +220,14 @@ TEST(ParserComponentTest, MultipleObjectsEachHaveTheirOwnComponents) {
 }
 
 //  Grupa: Parser -- scenariusze brzegowe
-TEST(ParserEdgeCaseTest, ObjectWithEmptyNameIsParsed) {
+TEST(ParserEdgeCaseTest, ObjectWithEmptyNameThrowsError) {
     NeuronIDE::Scene scene;
     scene.set_project_name("EmptyObjName");
     auto* obj = scene.add_scene_objects();
     obj->set_name("");
     obj->set_is_visible(true);
 
-    auto result = utils::parseProtoScene(scene);
-    ASSERT_EQ(result->getObjects().size(), 1u);
-    EXPECT_EQ(result->getObjects()[0]->name, "");
+    EXPECT_THROW({utils::parseProtoScene(scene)}, std::invalid_argument);
 }
 
 TEST(ParserEdgeCaseTest, LargeNumberOfObjectsIsHandled) {
@@ -254,7 +251,7 @@ TEST(ParserEdgeCaseTest, BlinkFrequencyZeroIsValid) {
     EXPECT_EQ(result->getObjects()[0]->components.size(), 1u);
 }
 
-TEST(ParserEdgeCaseTest, ParseReturnsDifferentObjectEachCall) {
+TEST(ParserEdgeCaseTest, ParserReturnsDifferentObjectEachCall) {
     auto              scene = utils::buildSimpleScene();
     std::stringstream ss1;
     scene.SerializeToOstream(&ss1);
