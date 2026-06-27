@@ -28,7 +28,8 @@ TEST(ParserSceneNameTest, EmptyProjectNameThrowsError) {
 //  Grupa: Parser -- liczba obiektow sceny
 TEST(ParserObjectCountTest, EmptySceneHasNoObjects) {
     NeuronIDE::Scene protoScene;
-    auto             result = utils::parseProtoScene(protoScene);
+    protoScene.set_project_name("EmptyScene");
+    auto result = utils::parseProtoScene(protoScene);
     EXPECT_TRUE(result->getObjects().empty());
 }
 
