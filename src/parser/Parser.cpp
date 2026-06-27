@@ -31,6 +31,10 @@ std::shared_ptr<Scene> Parser::parseStream(std::istream& stream) {
         throw std::runtime_error("Parser: failed to parse protobuf from stream");
     }
 
+    if (protoScene.project_name().empty()) {
+        throw std::invalid_argument("Parser: project name cannot be empty");
+    }
+
     auto scene = std::make_shared<::Scene>();
     scene->setExperimentName(protoScene.project_name());
 
@@ -43,6 +47,10 @@ std::shared_ptr<Scene> Parser::parseStream(std::istream& stream) {
 }
 
 std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObject& protoObj) {
+    if (protoObj.name().empty()) {
+        throw std::invalid_argument("SceneObject name cannot be empty");
+    }
+
     auto obj = std::make_shared<SceneObject>(protoObj.name(), protoObj.is_visible());
 
     if (protoObj.has_transform()) {
