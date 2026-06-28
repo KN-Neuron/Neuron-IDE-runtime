@@ -13,8 +13,7 @@
 #include "utils/ParserTestUtils.hpp"
 
 TEST(ParserFileTest, ThrowsWhenFileDoesNotExist) {
-    Parser parser;
-    EXPECT_THROW(parser.parse("/nonexistent/path/scene.pb"), std::runtime_error);
+    EXPECT_THROW(Parser::parse("/nonexistent/path/scene.pb"), std::runtime_error);
 }
 
 TEST(ParserFileTest, ReturnsNonNullSceneForValidFile) {
@@ -26,8 +25,7 @@ TEST(ParserFileTest, ReturnsNonNullSceneForValidFile) {
         scene.SerializeToOstream(&out);
     }
 
-    Parser parser;
-    auto   result = parser.parse(path);
+    auto result = Parser::parse(path);
     ASSERT_NE(result, nullptr);
 
     std::filesystem::remove(path);

@@ -200,8 +200,7 @@ TEST(ParserComponentTest, DuplicateComponentTypeThrows) {
     std::stringstream ss;
     scene.SerializeToOstream(&ss);
 
-    Parser parser;
-    EXPECT_THROW(parser.parseStream(ss), std::runtime_error);
+    EXPECT_THROW(Parser::parseStream(ss), std::runtime_error);
 }
 
 TEST(ParserComponentTest, MultipleObjectsEachHaveTheirOwnComponents) {
@@ -259,8 +258,7 @@ TEST(ParserEdgeCaseTest, ParserReturnsDifferentObjectEachCall) {
     std::stringstream ss2;
     scene.SerializeToOstream(&ss2);
 
-    Parser parser;
-    auto   r1 = parser.parseStream(ss1);
-    auto   r2 = parser.parseStream(ss2);
+    auto r1 = Parser::parseStream(ss1);
+    auto r2 = Parser::parseStream(ss2);
     EXPECT_NE(r1.get(), r2.get());
 }

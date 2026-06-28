@@ -29,10 +29,9 @@ inline NeuronIDE::Scene buildSimpleScene(const std::string& projectName = "TestP
 }
 
 inline std::shared_ptr<Scene> parseProtoScene(const NeuronIDE::Scene& scene) {
-    std::stringstream ss;
-    scene.SerializeToOstream(&ss);
-    Parser parser;
-    return parser.parseStream(ss);
+    std::stringstream stream;
+    scene.SerializeToOstream(&stream);
+    return Parser::parseStream(stream);
 }
 
 }  // namespace utils
