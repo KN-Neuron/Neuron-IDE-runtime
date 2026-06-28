@@ -14,8 +14,8 @@
 #include "utils/ParserTestUtils.hpp"
 
 namespace {
-constexpr int kMultipleObjects   = 5;
-constexpr int kLargeObjectCount  = 500;
+constexpr int kMultipleObjects  = 5;
+constexpr int kLargeObjectCount = 500;
 
 constexpr double kPosX        = 10.5;
 constexpr double kPosY        = 20.25;
@@ -269,7 +269,7 @@ TEST(ParserEdgeCaseTest, LargeNumberOfObjectsIsHandled) {
 }
 
 TEST(ParserEdgeCaseTest, BlinkFrequencyZeroIsValid) {
-    auto scene  = utils::buildSimpleScene(
+    auto scene = utils::buildSimpleScene(
         {.projectName = "P", .objectName = "ZeroHz", .isVisible = true, .blinkFrequency = 0.0});
     auto result = utils::parseProtoScene(scene);
     ASSERT_EQ(result->getObjects().size(), 1U);
