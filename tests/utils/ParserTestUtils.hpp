@@ -11,19 +11,26 @@
 
 namespace utils {
 
-inline NeuronIDE::Scene buildSimpleScene(const std::string& projectName = "TestProject",
-                                         const std::string& objectName  = "ObiektA",
-                                         bool isVisible = true, double blinkFrequency = 1.5) {
+inline constexpr double kDefaultBlinkFrequencyHz = 1.5;
+
+struct SimpleSceneParams {
+    std::string projectName    = "TestProject";
+    std::string objectName     = "ObiektA";
+    bool        isVisible      = true;
+    double      blinkFrequency = kDefaultBlinkFrequencyHz;
+};
+
+inline NeuronIDE::Scene buildSimpleScene(const SimpleSceneParams& params = {}) {
     NeuronIDE::Scene scene;
-    scene.set_project_name(projectName);
+    scene.set_project_name(params.projectName);
 
     auto* obj = scene.add_scene_objects();
-    obj->set_name(objectName);
-    obj->set_is_visible(isVisible);
+    obj->set_name(params.objectName);
+    obj->set_is_visible(params.isVisible);
 
     auto* comp    = obj->add_components();
     auto* blinker = comp->mutable_blinker();
-    blinker->set_blink_frequency_hz(blinkFrequency);
+    blinker->set_blink_frequency_hz(params.blinkFrequency);
 
     return scene;
 }
