@@ -1,9 +1,0 @@
-# Test code intentionally uses literal sample data, short loop/index
-# variables, and convenience helpers. Relax the checks that flag those
-# patterns while keeping the rest of the project configuration.
-InheritParentConfig: true
-Checks: >
-  -readability-magic-numbers,
-  -readability-identifier-length,
-  -readability-uppercase-literal-suffix,
-  -bugprone-easily-swappable-parameters
