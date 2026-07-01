@@ -44,7 +44,6 @@ constexpr const char* kSampleConfig = R"json({
   "impedance_check": { "supported": true, "threshold_kohm": 5.0 }
 })json";
 
-
 constexpr const char* kMinimalConfig = R"json({
   "config_version": "1.0",
   "device_name": "Dev",
