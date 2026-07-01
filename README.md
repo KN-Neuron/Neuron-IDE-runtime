@@ -203,7 +203,7 @@ stream rather than letting an exception terminate the process.
 | `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `LSLConfig` |
 | `ConfigParser`              | Implemented   | `config.json` → `ExperimentConfig` (incl. `LSLConfig`), nlohmann/json |
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
-| `Runtime` orchestration     | **Stub**      | parses `config.json` and starts `LSLReader`; wiring of Parser + the remaining threads is the next integration step |
+| `Runtime` orchestration     | **Stub**      | currently does nothing |
 
 The class diagram in older docs is partly aspirational; the table above reflects
 the actual code.
@@ -214,7 +214,6 @@ the actual code.
 Neuron-IDE-runtime/       # the C++ runtime (git repo)
   ├── README.md             # this file, code context
   ├── CMakeLists.txt        # top-level: deps, warnings, static analysis, coverage
-  ├── config.json           # example device config (LSL stream, channels, montage)
   ├── cmake/                # Dependencies / CompilerWarnings / StaticAnalysis / Coverage
   ├── protoFiles/
   │   ├── neuronide.proto   # experiment file schema
@@ -254,7 +253,7 @@ sudo apt install cmake clang-format clang-tidy libsdl2-dev protobuf-compiler gco
 ```bash
 cmake -B build
 cmake --build build
-./build/src/NeuronIDE config.json   # parses the device config, starts LSLReader (stub run)
+./build/src/NeuronIDE config.json experiment.neuroz  # parses the device config, parses scene, starts LSLReader, DataWriter, Renderer.
 ```
 
 `NeuronIDE` takes the path to a device `config.json` (defaults to `config.json` in
