@@ -9,6 +9,7 @@
 #include <config/ConfigVersion.hpp>
 #include <config/DeviceConfig.hpp>
 #include <config/LSLConfig.hpp>
+#include <config/OutputConfig.hpp>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -59,11 +60,14 @@ void ImpedanceConfig::validate() const {
     }
 }
 
+void OutputConfig::validate() const { requireNonEmpty(format, "format", "OutputConfig"); }
+
 void DeviceConfig::validate() const {
     configVersion.validate();
     requireNonEmpty(deviceName, "device_name", "DeviceConfig");
     lsl.validate();
     impedance.validate();
+    output.validate();
 
     if (static_cast<int>(channels.size()) != lsl.expectedChannelCount) {
         throw std::invalid_argument("DeviceConfig: channel count mismatch: 'channels' has " +
