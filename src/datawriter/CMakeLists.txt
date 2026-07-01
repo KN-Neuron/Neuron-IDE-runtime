@@ -1,5 +1,6 @@
 add_library(datawriter OBJECT
     CSVFormatStrategy.cpp
+    DataFormatStrategyFactory.cpp
     DataWriter.cpp
 )
 

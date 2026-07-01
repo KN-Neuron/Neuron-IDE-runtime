@@ -125,6 +125,23 @@ TEST(ConfigValidationTest, NegativeImpedanceThresholdThrows) {
     EXPECT_THROW(config.validate(), std::invalid_argument);
 }
 
+TEST(ConfigValidationTest, EmptyOutputFormatThrows) {
+    DeviceConfig config = makeValidConfig();
+    config.output.format.clear();
+
+    EXPECT_THROW(config.validate(), std::invalid_argument);
+}
+
+TEST(ConfigValidationTest, UnknownOutputFormatIsNotAConfigRule) {
+    // Which formats exist is DataFormatStrategyFactory's knowledge, not the
+    // config layer's; an unknown-but-present format passes validation and is
+    // rejected when the strategy is built.
+    DeviceConfig config  = makeValidConfig();
+    config.output.format = "parquet";
+
+    EXPECT_NO_THROW(config.validate());
+}
+
 TEST(ConfigValidationTest, NegativeVersionComponentThrows) {
     DeviceConfig config        = makeValidConfig();
     config.configVersion.minor = -1;
