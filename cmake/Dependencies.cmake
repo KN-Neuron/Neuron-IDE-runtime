@@ -27,6 +27,14 @@ FetchContent_Declare(
   SYSTEM
 )
 
+# 4. nlohmann/json (header-only) - device config parsing
+FetchContent_Declare(
+  nlohmann_json
+  URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+  SYSTEM
+)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+
 # Suppress compiler warnings from third-party targets when compiling their source files
 set(BACKUP_C_FLAGS "${CMAKE_C_FLAGS}")
 set(BACKUP_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -38,14 +46,14 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /w")
 endif()
 
-FetchContent_MakeAvailable(googletest liblsl concurrentqueue)
+FetchContent_MakeAvailable(googletest liblsl concurrentqueue nlohmann_json)
 
 # Restore compiler flags for our own project code
 set(CMAKE_C_FLAGS "${BACKUP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${BACKUP_CXX_FLAGS}")
 
-# 4. SDL2 (System installed)
+# 5. SDL2 (System installed)
 find_package(SDL2 REQUIRED)
 
-# 5. Protobuf (System installed)
+# 6. Protobuf (System installed)
 find_package(Protobuf REQUIRED)

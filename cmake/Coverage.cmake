@@ -30,7 +30,9 @@ if(NEURON_IDE_ENABLE_COVERAGE)
             --exclude ".*protoFiles.*"
             --exclude ".*pb.*"
             --exclude ".*\\.hpp"
-            --fail-under-line 60
+            --exclude-throw-branches
+            --exclude-unreachable-branches
+            --fail-under-line 90
             --print-summary
             --html-details ${COVERAGE_DIR}/index.html
             --xml ${COVERAGE_DIR}/coverage.xml
