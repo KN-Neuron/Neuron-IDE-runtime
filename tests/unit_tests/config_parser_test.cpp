@@ -294,6 +294,51 @@ TEST(ConfigParserTest, OptionalSectionsDefaultWhenAbsent) {
     EXPECT_DOUBLE_EQ(config.impedance.thresholdKohm, kDefaultImpedanceThreshold);
 }
 
+TEST(ConfigParserTest, OutputFormatDefaultsToCsvWhenAbsent) {
+    const ExperimentConfig config = parseString(kMinimalConfig);
+    EXPECT_EQ(config.output.format, "csv");
+}
+
+TEST(ConfigParserTest, ParsesOutputFormat) {
+    const std::string      jsonText = R"json({
+      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
+      "lsl_stream": {
+        "name": "s", "type": "EEG", "source_id": "x",
+        "expected_channel_count": 1, "expected_sample_rate_hz": 250
+      },
+      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ],
+      "output": { "format": "csv" }
+    })json";
+    const ExperimentConfig config   = parseString(jsonText);
+    EXPECT_EQ(config.output.format, "csv");
+}
+
+TEST(ConfigParserTest, EmptyOutputFormatThrows) {
+    const std::string jsonText = R"json({
+      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
+      "lsl_stream": {
+        "name": "s", "type": "EEG", "source_id": "x",
+        "expected_channel_count": 1, "expected_sample_rate_hz": 250
+      },
+      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ],
+      "output": { "format": "" }
+    })json";
+    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
+}
+
+TEST(ConfigParserTest, MissingOutputFormatFieldThrows) {
+    const std::string jsonText = R"json({
+      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
+      "lsl_stream": {
+        "name": "s", "type": "EEG", "source_id": "x",
+        "expected_channel_count": 1, "expected_sample_rate_hz": 250
+      },
+      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ],
+      "output": { }
+    })json";
+    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
+}
+
 TEST(ConfigParserTest, ParsesFromFilePath) {
     const fs::path path = writeTempConfig(kSampleConfig);
 

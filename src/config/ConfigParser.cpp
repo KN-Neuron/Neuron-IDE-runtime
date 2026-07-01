@@ -124,6 +124,15 @@ ImpedanceConfig buildImpedance(const json& root) {
     }
     return impedance;
 }
+
+OutputConfig buildOutput(const json& root) {
+    OutputConfig output;
+    if (root.contains("output")) {
+        output.format = requireField<std::string>(root.at("output"), "format", "output");
+        requireNonEmpty(output.format, "format", "output");
+    }
+    return output;
+}
 }  // namespace
 
 ExperimentConfig ConfigParser::parse(const std::string& filePath) {
@@ -164,6 +173,7 @@ ExperimentConfig ConfigParser::parseStream(std::istream& stream) {
         config.reference = buildReference(root);
         config.ground    = buildGround(root);
         config.impedance = buildImpedance(root);
+        config.output    = buildOutput(root);
 
         return config;
     } catch (const json::type_error& e) {

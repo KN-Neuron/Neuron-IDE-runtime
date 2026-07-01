@@ -2,6 +2,7 @@
 #define EXPERIMENTCONFIG_HPP
 
 #include <config/LSLConfig.hpp>
+#include <config/OutputConfig.hpp>
 #include <string>
 
 struct ReferenceConfig {
@@ -26,7 +27,7 @@ struct ExperimentConfig {
     ReferenceConfig reference;
     GroundConfig    ground;
     ImpedanceConfig impedance;
-    // TODO: DataWriterConfig writer;  // EEG output file format strategy
+    OutputConfig    output;
 };
 
 #endif  // EXPERIMENTCONFIG_HPP
