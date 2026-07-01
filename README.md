@@ -37,6 +37,7 @@ EEG samples and the stimulus markers must share a **common clock domain** so tha
 | Language                 | C++20                                                                  |
 | Build system             | CMake (≥ 3.25), Ninja-friendly                                         |
 | Experiment file format   | Protocol Buffers (proto3) — see `protoFiles/neuronide.proto`           |
+| Device config format     | JSON (`config.json`) parsed with [nlohmann/json](https://github.com/nlohmann/json) |
 | EEG acquisition          | [LSL — Lab Streaming Layer](https://github.com/sccn/liblsl) (`liblsl`) |
 | Rendering / windowing    | SDL2 (+ SDL2_image), with vsync                                        |
 | Inter-thread queues      | [moodycamel ConcurrentQueue](https://github.com/cameron314/concurrentqueue) (lock-free) |
@@ -44,8 +45,9 @@ EEG samples and the stimulus markers must share a **common clock domain** so tha
 | Testing                  | GoogleTest + CTest                                                     |
 | Tooling                  | clang-format, clang-tidy, gcovr (coverage)                             |
 
-`liblsl`, `concurrentqueue`, and `googletest` are fetched automatically by CMake
-(`FetchContent`). SDL2 and Protobuf are expected to be installed on the system.
+`liblsl`, `concurrentqueue`, `nlohmann/json`, and `googletest` are fetched
+automatically by CMake (`FetchContent`). SDL2 and Protobuf are expected to be
+installed on the system.
 
 ## 3. Architecture
 
@@ -198,9 +200,10 @@ stream rather than letting an exception terminate the process.
 | `ComponentRegistry`         | Implemented   | proto-type → factory, macro-based self-registration          |
 | `specifiic components` | **Planned** | defined in `neuronide.proto`, not yet implemented in C++     |
 | `Renderer`                  | Implemented   | SDL + vsync, marker timestamping                             |
-| `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4)                |
+| `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `LSLConfig` |
+| `ConfigParser`              | Implemented   | `config.json` → `ExperimentConfig` (incl. `LSLConfig`), nlohmann/json |
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
-| `Runtime` orchestration     | **Stub**      | `Runtime::start()` currently only prints; wiring of Parser + the three threads is the next integration step |
+| `Runtime` orchestration     | **Stub**      | parses `config.json` and starts `LSLReader`; wiring of Parser + the remaining threads is the next integration step |
 
 The class diagram in older docs is partly aspirational; the table above reflects
 the actual code.
@@ -211,12 +214,14 @@ the actual code.
 Neuron-IDE-runtime/       # the C++ runtime (git repo)
   ├── README.md             # this file, code context
   ├── CMakeLists.txt        # top-level: deps, warnings, static analysis, coverage
+  ├── config.json           # example device config (LSL stream, channels, montage)
   ├── cmake/                # Dependencies / CompilerWarnings / StaticAnalysis / Coverage
   ├── protoFiles/
   │   ├── neuronide.proto   # experiment file schema
   │   └── tests/            # .pbtxt fixtures + compiled .pb
   ├── include/              # public headers, mirrored by src/
   │   ├── data_structures/  # EEGData, Marker, Context
+  │   ├── config/           # ConfigParser + ExperimentConfig / LSLConfig / ChannelConfig
   │   ├── parser/           # Parser
   │   ├── scene/            # Scene, SceneObject, components/
   │   ├── renderer/         # Renderer
@@ -249,8 +254,11 @@ sudo apt install cmake clang-format clang-tidy libsdl2-dev protobuf-compiler gco
 ```bash
 cmake -B build
 cmake --build build
-./build/src/NeuronIDE        # run the (currently stub) executable
+./build/src/NeuronIDE config.json   # parses the device config, starts LSLReader (stub run)
 ```
+
+`NeuronIDE` takes the path to a device `config.json` (defaults to `config.json` in
+the working directory).
 
 ### Tests
 
@@ -300,10 +308,3 @@ protoc --encode=NeuronIDE.Scene protoFiles/neuronide.proto \
   `feat(parser): create Parser class`.
 - **Types:** `feat`, `fix`, `style` (clang config), `test`, `ci` (`.github`).
 
-## 10. Roadmap (next steps)
-
-1. Implement `Runtime` orchestration: `Parser → Scene`, then run `Renderer`,
-   `LSLReader`, and `DataWriter` concurrently and shut them down cleanly.
-2. Implement the remaining components: `SpriteRenderer`, `TextRenderer`,
-   `ScriptComponent` (pybind11), each self-registering with `ComponentRegistry`.
-3. Validate `LSLReader` end-to-end against a real EEG headset.
