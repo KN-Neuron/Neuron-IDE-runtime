@@ -33,7 +33,6 @@ void requireNonEmpty(const std::string& value, const char* field, std::string_vi
     }
 }
 
-
 std::vector<ChannelConfig> buildChannels(const json& root, int expectedCount) {
     const json& channelsJson = *requireMember(root, "channels", "config root");
     if (!channelsJson.is_array()) {
