@@ -59,3 +59,6 @@ _deps/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# config files
+*.json
