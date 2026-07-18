@@ -45,6 +45,7 @@ CTestTestfile.cmake
 _deps/
 
 # IDEs and Editors
+.clangd
 .vscode/
 .idea/
 *.swp
