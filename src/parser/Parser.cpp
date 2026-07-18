@@ -43,6 +43,8 @@ std::shared_ptr<Scene> Parser::parseStream(std::istream& stream) {
         scene->addObject(std::move(obj));
     }
 
+    scene->onSceneReady();
+
     return scene;
 }
 
