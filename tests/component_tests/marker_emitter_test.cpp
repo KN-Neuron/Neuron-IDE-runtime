@@ -151,9 +151,9 @@ TEST(MarkerEmitterIntegration, FullFlow) {
     // Build scene with a provider and an emitter
     auto scene = std::make_shared<Scene>();
 
-    auto providerObj  = std::make_shared<SceneObject>("Provider");
-    auto providerComp = std::make_unique<TestEventProvider>(providerObj);
-    auto* providerPtr = providerComp.get();
+    auto  providerObj  = std::make_shared<SceneObject>("Provider");
+    auto  providerComp = std::make_unique<TestEventProvider>(providerObj);
+    auto* providerPtr  = providerComp.get();
     providerObj->addComponent(std::move(providerComp));
     scene->addObject(providerObj);
 

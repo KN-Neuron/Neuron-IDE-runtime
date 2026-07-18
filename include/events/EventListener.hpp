@@ -5,7 +5,7 @@ struct Context;
 
 class EventListener {
    public:
-    EventListener()  = default;
+    EventListener()          = default;
     virtual ~EventListener() = default;
 
     EventListener(const EventListener&)            = delete;
