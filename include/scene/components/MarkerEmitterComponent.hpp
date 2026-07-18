@@ -37,8 +37,7 @@ class MarkerEmitterComponent : public Component {
     void onSceneReady(Scene& scene) override;
 
     static std::unique_ptr<Component> createMarkerEmitter(
-        const NeuronIDE::Component&         protoComp,
-        const std::shared_ptr<SceneObject>& owner);
+        const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner);
 
    private:
     struct ActiveSubscription {
@@ -46,8 +45,8 @@ class MarkerEmitterComponent : public Component {
         Delegate*                        delegate = nullptr;
     };
 
-    std::vector<Binding>             bindings;
-    std::vector<ActiveSubscription>  activeSubscriptions;
+    std::vector<Binding>            bindings;
+    std::vector<ActiveSubscription> activeSubscriptions;
 };
 
 #endif  // MARKEREMITTERCOMPONENT_HPP

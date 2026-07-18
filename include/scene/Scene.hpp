@@ -27,7 +27,7 @@ class Scene {
     void update(const Context& ctx);
     void render(SDL_Renderer* renderer);
 
-    void onSceneReady();
+    void      onSceneReady();
     Delegate& resolveEvents(std::string_view objectName, std::string_view eventName);
 };
 

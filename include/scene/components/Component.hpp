@@ -24,7 +24,7 @@ class Component {
     virtual void update(const Context& context) = 0;
     virtual void render(SDL_Renderer* renderer) = 0;
 
-    virtual void onSceneReady(Scene& scene) { (void)scene; }
+    virtual void      onSceneReady(Scene& scene) { (void)scene; }
     virtual Delegate* getEvent(std::string_view eventName) {
         (void)eventName;
         return nullptr;
