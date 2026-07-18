@@ -3,8 +3,10 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
+class Delegate;
 class SceneObject;
 class SDL_Renderer;
 struct Context;
@@ -24,6 +26,9 @@ class Scene {
 
     void update(const Context& ctx);
     void render(SDL_Renderer* renderer);
+
+    void onSceneReady();
+    Delegate& resolveEvents(std::string_view objectName, std::string_view eventName);
 };
 
 #endif  // SCENE_HPP
