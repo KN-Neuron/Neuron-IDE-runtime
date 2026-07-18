@@ -3,6 +3,7 @@ add_library(scene OBJECT
     Scene.cpp
     components/ComponentRegistry.cpp
     components/BlinkComponent.cpp
+    components/MarkerEmitterComponent.cpp
 )
 target_include_directories(scene PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 target_link_libraries(scene PUBLIC neuronide_proto)
