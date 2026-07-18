@@ -21,6 +21,15 @@ message ScriptComponent {
   string script_path = 1;
 }
 
+message MarkerEmitterComponent {
+  message Binding {
+    string target_object = 1;
+    string target_event = 2;
+    string marker_name = 3;
+  }
+  repeated Binding bindings = 1;
+}
+
 message Transform {
   double x = 1;
   double y = 2;
@@ -35,6 +44,7 @@ message Component {
     TextRenderer text = 2;
     BlinkComponent blinker = 3;
     ScriptComponent script = 4;
+    MarkerEmitterComponent marker_emitter = 5;
   }
 }
 
