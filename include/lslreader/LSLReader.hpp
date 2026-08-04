@@ -3,15 +3,23 @@
 
 #include <concurrentqueue.h>
 
-#include <config/LSLConfig.hpp>
+#include <config/DeviceConfig.hpp>
+#include <cstddef>
 #include <memory>
 #include <thread>
+#include <vector>
 
 struct EEGData;
 
+// Acquires the device's LSL stream on its own worker thread and pushes samples
+// onto eegQueue. Only the channels the device config marks as enabled are
+// forwarded; each pushed EEGData holds those channels in config declaration
+// order, so its values line up with the enabled entries of DeviceConfig::channels.
 class LSLReader {
    public:
-    explicit LSLReader(LSLConfig config);
+    // Throws std::invalid_argument if the config enables no channels or an
+    // enabled channel index is outside the expected channel count.
+    explicit LSLReader(DeviceConfig deviceConfig);
     ~LSLReader();
 
     LSLReader(const LSLReader&)            = delete;
@@ -25,7 +33,10 @@ class LSLReader {
    private:
     void readLoop(const std::stop_token& stopToken);
 
-    LSLConfig                                             config;
+    DeviceConfig config;
+    // Sample offsets to forward, in config declaration order.
+    std::vector<std::size_t>                              enabledChannelIndices;
+    bool                                                  forwardsWholeSample = false;
     std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>> eegQueue;
     std::jthread                                          readerThread;
 };

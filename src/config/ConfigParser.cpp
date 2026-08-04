@@ -1,10 +1,15 @@
 #include "config/ConfigParser.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <charconv>
+#include <cstddef>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -31,6 +36,50 @@ void requireNonEmpty(const std::string& value, const char* field, std::string_vi
         throw std::invalid_argument("ConfigParser: '" + std::string(field) +
                                     "' must not be empty in " + std::string(ctx));
     }
+}
+
+bool toUnsigned(std::string_view text, int& out) {
+    const bool digitsOnly =
+        !text.empty() && std::all_of(text.begin(), text.end(), [](unsigned char character) {
+            return std::isdigit(character) != 0;
+        });
+    if (!digitsOnly) {
+        return false;
+    }
+
+    const char* const first   = text.data();
+    const char* const last    = text.data() + text.size();
+    const auto [parsed, code] = std::from_chars(first, last, out);
+    return code == std::errc{} && parsed == last;
+}
+
+// "MAJOR.MINOR" -> ConfigVersion. Anything else ("1", "v1", "1.2.3", "") is
+// rejected: a version that cannot be compared is worse than no version at all.
+ConfigVersion parseConfigVersion(const std::string& text) {
+    const std::size_t dot = text.find('.');
+    ConfigVersion     version;
+
+    if (dot == std::string::npos ||
+        !toUnsigned(std::string_view(text).substr(0, dot), version.major) ||
+        !toUnsigned(std::string_view(text).substr(dot + 1), version.minor)) {
+        throw std::invalid_argument(
+            "ConfigParser: 'config_version' must be \"MAJOR.MINOR\", got \"" + text + "\"");
+    }
+    return version;
+}
+
+// Checked before anything else is parsed: on an unsupported schema every later
+// error would be a misleading missing/renamed field complaint.
+ConfigVersion requireSupportedVersion(const json& root) {
+    const ConfigVersion version =
+        parseConfigVersion(requireField<std::string>(root, "config_version", "config root"));
+
+    if (version.major != ConfigParser::kSupportedConfigMajor) {
+        throw std::invalid_argument("ConfigParser: config_version " + version.toString() +
+                                    " is not supported by this runtime (supports " +
+                                    std::to_string(ConfigParser::kSupportedConfigMajor) + ".x)");
+    }
+    return version;
 }
 
 std::vector<ChannelConfig> buildChannels(const json& root, int expectedCount) {
@@ -71,7 +120,7 @@ std::vector<ChannelConfig> buildChannels(const json& root, int expectedCount) {
     return channels;
 }
 
-LSLConfig buildLSLConfig(const json& root) {
+LSLConfig buildLSLStream(const json& root) {
     const json& streamJson = *requireMember(root, "lsl_stream", "config root");
 
     LSLConfig lsl;
@@ -93,7 +142,6 @@ LSLConfig buildLSLConfig(const json& root) {
         throw std::invalid_argument("ConfigParser: 'expected_sample_rate_hz' must be positive");
     }
 
-    lsl.channels = buildChannels(root, lsl.expectedChannelCount);
     return lsl;
 }
 
@@ -126,7 +174,7 @@ ImpedanceConfig buildImpedance(const json& root) {
 }
 }  // namespace
 
-ExperimentConfig ConfigParser::parse(const std::string& filePath) {
+DeviceConfig ConfigParser::parse(const std::string& filePath) {
     std::ifstream file(filePath);
     if (!file.is_open()) {
         throw std::runtime_error("ConfigParser: cannot open file: " + filePath);
@@ -140,7 +188,7 @@ ExperimentConfig ConfigParser::parse(const std::string& filePath) {
     }
 }
 
-ExperimentConfig ConfigParser::parseStream(std::istream& stream) {
+DeviceConfig ConfigParser::parseStream(std::istream& stream) {
     json root;
     try {
         root = json::parse(stream);
@@ -153,16 +201,17 @@ ExperimentConfig ConfigParser::parseStream(std::istream& stream) {
     }
 
     try {
-        ExperimentConfig config;
-        config.configVersion   = requireField<std::string>(root, "config_version", "config root");
+        DeviceConfig config;
+        config.configVersion   = requireSupportedVersion(root);
         config.deviceName      = requireField<std::string>(root, "device_name", "config root");
         config.montageStandard = requireField<std::string>(root, "montage_standard", "config root");
 
         requireNonEmpty(config.deviceName, "device_name", "config root");
 
-        config.lsl       = buildLSLConfig(root);
+        config.lsl       = buildLSLStream(root);
         config.reference = buildReference(root);
         config.ground    = buildGround(root);
+        config.channels  = buildChannels(root, config.lsl.expectedChannelCount);
         config.impedance = buildImpedance(root);
 
         return config;

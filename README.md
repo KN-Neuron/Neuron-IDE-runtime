@@ -88,7 +88,9 @@ flowchart LR
   `lsl::local_clock()` right after `SDL_RenderPresent` and pushes `Marker`s onto
   `markerQueue`.
 - **LSLReader** resolves and subscribes to the EEG LSL stream and continuously
-  pushes `EEGData` samples onto `eegQueue`.
+  pushes `EEGData` samples onto `eegQueue`. It forwards **only the channels the
+  device config enables** (see [§5 Configuration boundary](#5-configuration-boundary-protobuf-vs-json)),
+  in config declaration order.
 - **DataWriter** drains both queues and writes them to disk via a pluggable
   formatting strategy (currently CSV).
 
@@ -143,7 +145,7 @@ the parser does not need to know about concrete component classes.
 ```cpp
 struct EEGData {                 // one EEG sample
     double              timestamp;   // in the local_clock() domain (see §4)
-    std::vector<double> channels;
+    std::vector<double> channels;    // enabled channels only, in config order (see §5)
 };
 
 struct Marker {                  // one experiment event
@@ -171,7 +173,88 @@ are already mapped into the local `lsl::local_clock()` domain — the same clock
 Renderer uses. This is the single most important correctness property of the data
 path.
 
-## 5. Thread lifecycle conventions
+## 5. Configuration boundary: protobuf vs JSON
+
+The runtime is fed by **two** config inputs and they are not interchangeable.
+The split is deliberate and should be respected when adding new settings,
+otherwise the same experiment stops being portable between labs.
+
+> **The rule:** the **protobuf experiment file** describes *what the experiment
+> does*; the **device `config.json`** describes *what the hardware is*.
+> A new field belongs in protobuf if changing it changes the experiment's meaning
+> for analysis, and in JSON if it only changes how this particular machine
+> acquires or stores the data.
+
+| Goes in the protobuf experiment file (`.neuroz`)          | Goes in the device config (`config.json`)                          |
+| --------------------------------------------------------- | ------------------------------------------------------------------ |
+| Experiment name, scene objects, transforms, visibility      | Device name, montage standard (`10-20`, …)                          |
+| Components and their parameters (e.g. blink frequency)      | LSL stream identity: `name`, `type`, `source_id`                     |
+| Stimulus timing, trial structure, marker/event names        | Expected stream shape: channel count, sample rate                    |
+| Anything the editor authors and versions with the study     | Channel table: index, label, enabled, unit                           |
+|                                                             | Reference / ground electrodes, impedance check thresholds            |
+|                                                             | *(planned)* output file format for `DataWriter`                      |
+
+Consequences of the split:
+
+- The same experiment file runs on a different cap by swapping only
+  `config.json` — no re-export from the editor.
+- The runtime can validate the incoming LSL stream (channel count, sample rate)
+  **before** the experiment starts, because expectations are declared per device.
+- Electrode-level knowledge (which channel is `Oz`, which are enabled) lives in
+  one place, so `LSLReader` and, later, `DataWriter` agree on channel order.
+
+The JSON is parsed **1:1** into `DeviceConfig`: every JSON key maps onto exactly
+one field, and nesting in the file is the nesting in the struct. Keep it that
+way — `channels` is a top-level key, so it is a top-level `DeviceConfig` field
+(not tucked under `lsl`), even though `LSLReader` is its main consumer.
+
+```jsonc
+{
+  "config_version": "1.0",              // "MAJOR.MINOR", checked first (see below)
+  "device_name": "OpenBCI Cyton 8ch",
+  "montage_standard": "10-20",
+  "lsl_stream": {                       // -> DeviceConfig::lsl (LSLConfig)
+    "name": "obci_eeg1",
+    "type": "EEG",
+    "source_id": "cyton-a1b2c3",
+    "expected_channel_count": 8,        // must equal channels.size()
+    "expected_sample_rate_hz": 250
+  },
+  "reference": { "label": "linked_mastoids", "scheme": "physical" },
+  "ground": { "label": "Fpz" },
+  "channels": [                         // -> DeviceConfig::channels
+    { "index": 0, "label": "Fz", "enabled": true,  "unit": "microvolts" },
+    { "index": 1, "label": "Oz", "enabled": false, "unit": "microvolts" }
+    // ... one entry per expected_channel_count, indices unique and in range
+  ],
+  "impedance_check": { "supported": true, "threshold_kohm": 5.0 }
+}
+```
+
+`config_version`, `device_name`, `montage_standard`, `lsl_stream` and `channels`
+are required; `reference`, `ground` and `impedance_check` default when absent.
+Channels with `"enabled": false` stay in the config (they document the cap) but
+are **not** acquired: `LSLReader` drops them from every sample.
+
+### Schema versioning
+
+`config_version` is `"MAJOR.MINOR"` and is the **first** thing `ConfigParser`
+validates — on an unsupported schema every later complaint would be a misleading
+"missing field" message instead of "your config is newer than this runtime".
+
+- **MAJOR** — breaking change: a field moved, was renamed, or changed meaning.
+  A runtime rejects any major other than `ConfigParser::kSupportedConfigMajor`.
+- **MINOR** — additive, backward-compatible change: new optional keys. Any minor
+  of the supported major is accepted, and unknown keys are ignored, so a `1.7`
+  file still runs on a runtime that only knows `1.0`.
+- A version that cannot be compared (`"1"`, `"v1"`, `"1.2.3"`, empty) is rejected
+  rather than assumed — an unparseable version is worse than none.
+
+Bump MINOR when adding optional keys, MAJOR when moving or renaming any existing
+one, and raise `kSupportedConfigMajor` in the same commit that lands the breaking
+parser change.
+
+## 6. Thread lifecycle conventions
 
 Threads use C++20 `std::jthread` + `std::stop_token` for cooperative cancellation.
 Two ownership patterns are in use:
@@ -188,9 +271,14 @@ Two ownership patterns are in use:
 `start()` returns immediately instead of blocking the runtime while waiting for the
 cap), uses a **blocking pull with a finite timeout** (no busy-wait, low latency,
 periodic stop-token checks), and catches `lsl::lost_error` to re-resolve a dropped
-stream rather than letting an exception terminate the process.
+stream rather than letting an exception terminate the process. Recovery is
+deliberately *ours*: the inlet is created with liblsl's `recover` flag **off**, so
+a lost cap surfaces as `lsl::lost_error` instead of being silently reconnected, and
+the re-resolved stream is re-validated (channel count, sample rate) before
+acquisition continues. Config errors (mismatched stream shape, no enabled channels)
+stay fatal — they are logged and the worker exits instead of retrying forever.
 
-## 6. Implementation status
+## 7. Implementation status
 
 | Area / class                | Status        | Notes                                                        |
 | --------------------------- | ------------- | ------------------------------------------------------------ |
@@ -200,15 +288,15 @@ stream rather than letting an exception terminate the process.
 | `ComponentRegistry`         | Implemented   | proto-type → factory, macro-based self-registration          |
 | `specifiic components` | **Planned** | defined in `neuronide.proto`, not yet implemented in C++     |
 | `Renderer`                  | Implemented   | SDL + vsync, marker timestamping                             |
-| `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `LSLConfig` |
-| `ConfigParser`              | Implemented   | `config.json` → `ExperimentConfig` (incl. `LSLConfig`), nlohmann/json |
+| `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `DeviceConfig`, enabled channels only, re-resolves lost streams |
+| `ConfigParser`              | Implemented   | `config.json` → `DeviceConfig` (1:1 mapping, major-version checked, see §5), nlohmann/json |
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
 | `Runtime` orchestration     | **Stub**      | currently does nothing |
 
 The class diagram in older docs is partly aspirational; the table above reflects
 the actual code.
 
-## 7. Repository layout
+## 8. Repository layout
 
 ```
 Neuron-IDE-runtime/       # the C++ runtime (git repo)
@@ -220,7 +308,7 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
   │   └── tests/            # .pbtxt fixtures + compiled .pb
   ├── include/              # public headers, mirrored by src/
   │   ├── data_structures/  # EEGData, Marker, Context
-  │   ├── config/           # ConfigParser + ExperimentConfig / LSLConfig / ChannelConfig
+  │   ├── config/           # ConfigParser + DeviceConfig / LSLConfig / ChannelConfig / ConfigVersion
   │   ├── parser/           # Parser
   │   ├── scene/            # Scene, SceneObject, components/
   │   ├── renderer/         # Renderer
@@ -236,7 +324,7 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
 Each `src/<module>/` builds a static library; `runtime_core` links them together
 and the `NeuronIDE` executable links `runtime_core`.
 
-## 8. Build, test, and tooling
+## 9. Build, test, and tooling
 
 All commands are run from the `Neuron-IDE-runtime/` directory.
 
@@ -300,7 +388,7 @@ protoc --encode=NeuronIDE.Scene protoFiles/neuronide.proto \
   < protoFiles/tests/test_scene.pbtxt > protoFiles/tests/test_scene.pb
 ```
 
-## 9. Contribution conventions
+## 10. Contribution conventions
 
 - **Branches:** `<type>/<description>`, e.g. `feat/setup-project`.
 - **Commits:** `<type>(optional scope): description`, e.g.
