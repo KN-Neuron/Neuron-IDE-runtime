@@ -236,6 +236,34 @@ are required; `reference`, `ground` and `impedance_check` default when absent.
 Channels with `"enabled": false` stay in the config (they document the cap) but
 are **not** acquired: `LSLReader` drops them from every sample.
 
+### Validation contract
+
+Mapping and validation are separate jobs. `ConfigParser` only turns JSON into
+structs — presence of keys, types, array shape. Every *semantic* rule (non-empty
+stream identity, positive rate, channel count matching the stream, unique
+in-range indices) lives on the config types themselves as `validate()`, because
+none of those rules are about JSON and they must hold for any producer:
+
+```cpp
+DeviceConfig config = ConfigParser::parse("config.json");  // already validated
+```
+```cpp
+DeviceConfig config;      // hand-assembled: no guarantees
+config.lsl.name = ...;
+config.validate();        // throws std::invalid_argument on the first broken rule
+```
+
+**A `DeviceConfig` returned by `ConfigParser` has passed `validate()`. One you
+assemble yourself has not** — call it before handing the config to a consumer.
+`LSLReader` validates in its constructor rather than trusting its caller, since
+it indexes into raw samples with the configured channel offsets.
+
+Rules that need more context than the config carries stay with the consumer, not
+in `validate()`: "at least one channel is enabled" is an `LSLReader` precondition
+(a fully disabled cap is a valid *config*, just nothing to acquire), and
+"stream shape matches the live LSL stream" can only be checked against a resolved
+stream at runtime.
+
 ### Schema versioning
 
 `config_version` is `"MAJOR.MINOR"` and is the **first** thing `ConfigParser`
@@ -290,6 +318,7 @@ stay fatal — they are logged and the worker exits instead of retrying forever.
 | `Renderer`                  | Implemented   | SDL + vsync, marker timestamping                             |
 | `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `DeviceConfig`, enabled channels only, re-resolves lost streams |
 | `ConfigParser`              | Implemented   | `config.json` → `DeviceConfig` (1:1 mapping, major-version checked, see §5), nlohmann/json |
+| Config `validate()`         | Implemented   | semantic rules on the config types themselves, independent of JSON (see §5) |
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
 | `Runtime` orchestration     | **Stub**      | currently does nothing |
 

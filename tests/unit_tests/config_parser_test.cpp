@@ -182,27 +182,15 @@ TEST(ConfigParserTest, MissingChannelsThrows) {
     EXPECT_THROW(parseString(jsonText), std::invalid_argument);
 }
 
-TEST(ConfigParserTest, EmptyStreamNameThrows) {
+// The individual rules live in config_validation_test.cpp; this only pins that
+// the parser runs them on what it produced.
+TEST(ConfigParserTest, SemanticallyInvalidConfigIsRejected) {
     const std::string jsonText = R"json({
       "config_version": "1.0",
       "device_name": "Dev",
       "montage_standard": "10-20",
       "lsl_stream": {
         "name": "", "type": "EEG", "source_id": "x",
-        "expected_channel_count": 1, "expected_sample_rate_hz": 250
-      },
-      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ]
-    })json";
-    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
-}
-
-TEST(ConfigParserTest, ChannelCountMismatchThrows) {
-    const std::string jsonText = R"json({
-      "config_version": "1.0",
-      "device_name": "Dev",
-      "montage_standard": "10-20",
-      "lsl_stream": {
-        "name": "s", "type": "EEG", "source_id": "x",
         "expected_channel_count": 2, "expected_sample_rate_hz": 250
       },
       "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ]
@@ -223,54 +211,6 @@ TEST(ConfigParserTest, WrongFieldTypeThrows) {
                  std::invalid_argument);
 }
 
-TEST(ConfigParserTest, EmptyStreamTypeThrows) {
-    const std::string jsonText = R"json({
-      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
-      "lsl_stream": {
-        "name": "s", "type": "", "source_id": "x",
-        "expected_channel_count": 1, "expected_sample_rate_hz": 250
-      },
-      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ]
-    })json";
-    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
-}
-
-TEST(ConfigParserTest, EmptySourceIdThrows) {
-    const std::string jsonText = R"json({
-      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
-      "lsl_stream": {
-        "name": "s", "type": "EEG", "source_id": "",
-        "expected_channel_count": 1, "expected_sample_rate_hz": 250
-      },
-      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ]
-    })json";
-    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
-}
-
-TEST(ConfigParserTest, NonPositiveChannelCountThrows) {
-    const std::string jsonText = R"json({
-      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
-      "lsl_stream": {
-        "name": "s", "type": "EEG", "source_id": "x",
-        "expected_channel_count": 0, "expected_sample_rate_hz": 250
-      },
-      "channels": []
-    })json";
-    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
-}
-
-TEST(ConfigParserTest, NonPositiveSampleRateThrows) {
-    const std::string jsonText = R"json({
-      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
-      "lsl_stream": {
-        "name": "s", "type": "EEG", "source_id": "x",
-        "expected_channel_count": 1, "expected_sample_rate_hz": 0
-      },
-      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ]
-    })json";
-    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
-}
-
 TEST(ConfigParserTest, ChannelsNotArrayThrows) {
     const std::string jsonText = R"json({
       "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
@@ -279,45 +219,6 @@ TEST(ConfigParserTest, ChannelsNotArrayThrows) {
         "expected_channel_count": 1, "expected_sample_rate_hz": 250
       },
       "channels": 5
-    })json";
-    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
-}
-
-TEST(ConfigParserTest, ChannelIndexOutOfRangeThrows) {
-    const std::string jsonText = R"json({
-      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
-      "lsl_stream": {
-        "name": "s", "type": "EEG", "source_id": "x",
-        "expected_channel_count": 1, "expected_sample_rate_hz": 250
-      },
-      "channels": [ { "index": 5, "label": "Fz", "enabled": true, "unit": "uV" } ]
-    })json";
-    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
-}
-
-TEST(ConfigParserTest, NegativeChannelIndexThrows) {
-    const std::string jsonText = R"json({
-      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
-      "lsl_stream": {
-        "name": "s", "type": "EEG", "source_id": "x",
-        "expected_channel_count": 1, "expected_sample_rate_hz": 250
-      },
-      "channels": [ { "index": -1, "label": "Fz", "enabled": true, "unit": "uV" } ]
-    })json";
-    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
-}
-
-TEST(ConfigParserTest, DuplicateChannelIndexThrows) {
-    const std::string jsonText = R"json({
-      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
-      "lsl_stream": {
-        "name": "s", "type": "EEG", "source_id": "x",
-        "expected_channel_count": 2, "expected_sample_rate_hz": 250
-      },
-      "channels": [
-        { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" },
-        { "index": 0, "label": "Cz", "enabled": true, "unit": "uV" }
-      ]
     })json";
     EXPECT_THROW(parseString(jsonText), std::invalid_argument);
 }

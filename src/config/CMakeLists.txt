@@ -1,5 +1,6 @@
 add_library(config OBJECT
     ConfigParser.cpp
+    ConfigValidation.cpp
 )
 
 target_include_directories(config PUBLIC

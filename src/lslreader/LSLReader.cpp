@@ -23,22 +23,19 @@ constexpr bool   kRecoverSilently     = false;
 constexpr double kSampleRateTolerance = 0.5;  // Hz
 
 // Offsets of the enabled channels within a pulled sample, in the order the
-// config declares them.
-std::vector<std::size_t> selectEnabledChannels(const DeviceConfig& config) {
+// config declares them. Validates the config first: the reader indexes into raw
+// samples with these offsets, so it cannot take the config's invariants on
+// trust, and a hand-built DeviceConfig has not been through ConfigParser.
+std::vector<std::size_t> validatedChannelOffsets(const DeviceConfig& config) {
+    config.validate();
+
     std::vector<std::size_t> indices;
     indices.reserve(config.channels.size());
 
     for (const ChannelConfig& channel : config.channels) {
-        if (!channel.enabled) {
-            continue;
+        if (channel.enabled) {
+            indices.push_back(static_cast<std::size_t>(channel.index));
         }
-        if (channel.index < 0 || channel.index >= config.lsl.expectedChannelCount) {
-            throw std::invalid_argument("LSLReader: channel '" + channel.label + "' has index " +
-                                        std::to_string(channel.index) +
-                                        " outside the expected channel count " +
-                                        std::to_string(config.lsl.expectedChannelCount));
-        }
-        indices.push_back(static_cast<std::size_t>(channel.index));
     }
 
     if (indices.empty()) {
@@ -105,7 +102,7 @@ std::optional<lsl::stream_info> resolveStream(const LSLConfig&       config,
 
 LSLReader::LSLReader(DeviceConfig deviceConfig)
     : config(std::move(deviceConfig)),
-      enabledChannelIndices(selectEnabledChannels(config)),
+      enabledChannelIndices(validatedChannelOffsets(config)),
       forwardsWholeSample(
           coversWholeSample(enabledChannelIndices, config.lsl.expectedChannelCount)) {}
 

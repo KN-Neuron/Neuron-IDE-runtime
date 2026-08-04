@@ -17,8 +17,8 @@ struct EEGData;
 // order, so its values line up with the enabled entries of DeviceConfig::channels.
 class LSLReader {
    public:
-    // Throws std::invalid_argument if the config enables no channels or an
-    // enabled channel index is outside the expected channel count.
+    // Validates the config (see DeviceConfig::validate) and throws
+    // std::invalid_argument if it is invalid or enables no channels.
     explicit LSLReader(DeviceConfig deviceConfig);
     ~LSLReader();
 

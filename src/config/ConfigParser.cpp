@@ -10,7 +10,6 @@
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -29,13 +28,6 @@ const json* requireMember(const json& obj, const char* key, std::string_view ctx
 template <typename T>
 T requireField(const json& obj, const char* key, std::string_view ctx) {
     return requireMember(obj, key, ctx)->get<T>();
-}
-
-void requireNonEmpty(const std::string& value, const char* field, std::string_view ctx) {
-    if (value.empty()) {
-        throw std::invalid_argument("ConfigParser: '" + std::string(field) +
-                                    "' must not be empty in " + std::string(ctx));
-    }
 }
 
 bool toUnsigned(std::string_view text, int& out) {
@@ -82,21 +74,14 @@ ConfigVersion requireSupportedVersion(const json& root) {
     return version;
 }
 
-std::vector<ChannelConfig> buildChannels(const json& root, int expectedCount) {
+std::vector<ChannelConfig> buildChannels(const json& root) {
     const json& channelsJson = *requireMember(root, "channels", "config root");
     if (!channelsJson.is_array()) {
         throw std::invalid_argument("ConfigParser: 'channels' must be an array");
     }
-    if (static_cast<int>(channelsJson.size()) != expectedCount) {
-        throw std::invalid_argument("ConfigParser: channel count mismatch: 'channels' has " +
-                                    std::to_string(channelsJson.size()) +
-                                    " entries but expected_channel_count is " +
-                                    std::to_string(expectedCount));
-    }
 
     std::vector<ChannelConfig> channels;
     channels.reserve(channelsJson.size());
-    std::unordered_set<int> seenIndices;
 
     for (const auto& entry : channelsJson) {
         ChannelConfig channel;
@@ -104,15 +89,6 @@ std::vector<ChannelConfig> buildChannels(const json& root, int expectedCount) {
         channel.label   = requireField<std::string>(entry, "label", "channel");
         channel.enabled = requireField<bool>(entry, "enabled", "channel");
         channel.unit    = requireField<std::string>(entry, "unit", "channel");
-
-        if (channel.index < 0 || channel.index >= expectedCount) {
-            throw std::invalid_argument("ConfigParser: channel index out of range: " +
-                                        std::to_string(channel.index));
-        }
-        if (!seenIndices.insert(channel.index).second) {
-            throw std::invalid_argument("ConfigParser: duplicate channel index: " +
-                                        std::to_string(channel.index));
-        }
 
         channels.push_back(std::move(channel));
     }
@@ -131,16 +107,6 @@ LSLConfig buildLSLStream(const json& root) {
         requireField<int>(streamJson, "expected_channel_count", "lsl_stream");
     lsl.expectedSampleRateHz =
         requireField<double>(streamJson, "expected_sample_rate_hz", "lsl_stream");
-
-    requireNonEmpty(lsl.name, "name", "lsl_stream");
-    requireNonEmpty(lsl.type, "type", "lsl_stream");
-    requireNonEmpty(lsl.sourceId, "source_id", "lsl_stream");
-    if (lsl.expectedChannelCount <= 0) {
-        throw std::invalid_argument("ConfigParser: 'expected_channel_count' must be positive");
-    }
-    if (lsl.expectedSampleRateHz <= 0.0) {
-        throw std::invalid_argument("ConfigParser: 'expected_sample_rate_hz' must be positive");
-    }
 
     return lsl;
 }
@@ -205,15 +171,14 @@ DeviceConfig ConfigParser::parseStream(std::istream& stream) {
         config.configVersion   = requireSupportedVersion(root);
         config.deviceName      = requireField<std::string>(root, "device_name", "config root");
         config.montageStandard = requireField<std::string>(root, "montage_standard", "config root");
+        config.lsl             = buildLSLStream(root);
+        config.reference       = buildReference(root);
+        config.ground          = buildGround(root);
+        config.channels        = buildChannels(root);
+        config.impedance       = buildImpedance(root);
 
-        requireNonEmpty(config.deviceName, "device_name", "config root");
-
-        config.lsl       = buildLSLStream(root);
-        config.reference = buildReference(root);
-        config.ground    = buildGround(root);
-        config.channels  = buildChannels(root, config.lsl.expectedChannelCount);
-        config.impedance = buildImpedance(root);
-
+        // Mapping is done; the semantic rules belong to the types themselves.
+        config.validate();
         return config;
     } catch (const json::type_error& e) {
         throw std::invalid_argument(std::string("ConfigParser: field has wrong type: ") + e.what());
