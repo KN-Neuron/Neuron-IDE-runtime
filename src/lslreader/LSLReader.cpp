@@ -1,6 +1,7 @@
 #include "lslreader/LSLReader.hpp"
 
 #include <cmath>
+#include <cstddef>
 #include <data_structures/EEGData.hpp>
 #include <iostream>
 #include <optional>
@@ -12,10 +13,64 @@
 #include "lsl_cpp.h"
 
 namespace {
-constexpr double kResolveTimeout      = 1.0;  // seconds per resolve attempt
-constexpr double kPullTimeout         = 0.2;  // seconds; bounds stop-token check latency
-constexpr int    kInletBufferSeconds  = 360;  // liblsl default inlet buffer length
+constexpr double kResolveTimeout     = 1.0;  // seconds per resolve attempt
+constexpr double kPullTimeout        = 0.2;  // seconds; bounds stop-token check latency
+constexpr int    kInletBufferSeconds = 360;  // liblsl default inlet buffer length
+constexpr int    kSenderChunkLength  = 0;    // 0: the sender decides chunk granularity
+// Disables liblsl's silent recovery so a dropped stream surfaces as lsl::lost_error
+// and is re-resolved (and re-validated) here instead.
+constexpr bool   kRecoverSilently     = false;
 constexpr double kSampleRateTolerance = 0.5;  // Hz
+
+// Offsets of the enabled channels within a pulled sample, in the order the
+// config declares them.
+std::vector<std::size_t> selectEnabledChannels(const DeviceConfig& config) {
+    std::vector<std::size_t> indices;
+    indices.reserve(config.channels.size());
+
+    for (const ChannelConfig& channel : config.channels) {
+        if (!channel.enabled) {
+            continue;
+        }
+        if (channel.index < 0 || channel.index >= config.lsl.expectedChannelCount) {
+            throw std::invalid_argument("LSLReader: channel '" + channel.label + "' has index " +
+                                        std::to_string(channel.index) +
+                                        " outside the expected channel count " +
+                                        std::to_string(config.lsl.expectedChannelCount));
+        }
+        indices.push_back(static_cast<std::size_t>(channel.index));
+    }
+
+    if (indices.empty()) {
+        throw std::invalid_argument("LSLReader: config for stream '" + config.lsl.name +
+                                    "' enables no channels");
+    }
+    return indices;
+}
+
+// True when the enabled channels are the whole sample in stream order, so it can
+// be forwarded without copying.
+bool coversWholeSample(const std::vector<std::size_t>& indices, int expectedChannelCount) {
+    if (indices.size() != static_cast<std::size_t>(expectedChannelCount)) {
+        return false;
+    }
+    for (std::size_t position = 0; position < indices.size(); ++position) {
+        if (indices[position] != position) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<double> pickChannels(const std::vector<double>&      sample,
+                                 const std::vector<std::size_t>& indices) {
+    std::vector<double> selected;
+    selected.reserve(indices.size());
+    for (const std::size_t index : indices) {
+        selected.push_back(sample[index]);
+    }
+    return selected;
+}
 
 void validateStream(const lsl::stream_info& info, const LSLConfig& config) {
     if (info.channel_count() != config.expectedChannelCount) {
@@ -48,7 +103,11 @@ std::optional<lsl::stream_info> resolveStream(const LSLConfig&       config,
 }
 }  // namespace
 
-LSLReader::LSLReader(LSLConfig config) : config(std::move(config)) {}
+LSLReader::LSLReader(DeviceConfig deviceConfig)
+    : config(std::move(deviceConfig)),
+      enabledChannelIndices(selectEnabledChannels(config)),
+      forwardsWholeSample(
+          coversWholeSample(enabledChannelIndices, config.lsl.expectedChannelCount)) {}
 
 LSLReader::~LSLReader() { stop(); }
 
@@ -75,19 +134,35 @@ void LSLReader::stop() {
 }
 
 void LSLReader::readLoop(const std::stop_token& stopToken) {
-    const std::optional<lsl::stream_info> info = resolveStream(config, stopToken);
-    if (!info.has_value()) {
-        return;
-    }
-
-    lsl::stream_inlet inlet(*info, kInletBufferSeconds);
-    inlet.set_postprocessing(lsl::post_clocksync | lsl::post_dejitter | lsl::post_monotonize);
-
     while (!stopToken.stop_requested()) {
-        std::vector<double> sample;
-        const double        timestamp = inlet.pull_sample(sample, kPullTimeout);
-        if (timestamp != 0.0) {
-            eegQueue->enqueue(EEGData{timestamp, std::move(sample)});
+        const std::optional<lsl::stream_info> info = resolveStream(config.lsl, stopToken);
+        if (!info.has_value()) {
+            return;  // stop requested while waiting for the cap
+        }
+
+        try {
+            lsl::stream_inlet inlet(*info, kInletBufferSeconds, kSenderChunkLength,
+                                    kRecoverSilently);
+            inlet.set_postprocessing(lsl::post_clocksync | lsl::post_dejitter |
+                                     lsl::post_monotonize);
+
+            std::vector<double> sample;
+            while (!stopToken.stop_requested()) {
+                const double timestamp = inlet.pull_sample(sample, kPullTimeout);
+                if (timestamp == 0.0) {
+                    continue;
+                }
+
+                if (forwardsWholeSample) {
+                    eegQueue->enqueue(EEGData{timestamp, std::move(sample)});
+                } else {
+                    eegQueue->enqueue(
+                        EEGData{timestamp, pickChannels(sample, enabledChannelIndices)});
+                }
+            }
+        } catch (const lsl::lost_error& e) {
+            std::cerr << "LSLReader: stream '" << config.lsl.name << "' lost (" << e.what()
+                      << "), re-resolving\n";
         }
     }
 }
