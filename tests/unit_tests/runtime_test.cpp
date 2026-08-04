@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "utils/ParserTestUtils.hpp"
 
@@ -167,6 +168,22 @@ TEST_F(RuntimeFixture, OutputFilenameDerivedFromExperimentNameAndDir) {
     // Scene project name is "TestProject" (see ParserTestUtils::buildSimpleScene).
     EXPECT_EQ(output.filename().string().rfind("TestProject_", 0), 0U);
     EXPECT_EQ(output.extension(), ".csv");
+}
+
+TEST_F(RuntimeFixture, OutputFilenameSanitizesTheExperimentName) {
+    // An authored name is not a safe file name: unfiltered, "block 1/run" would
+    // point at a subdirectory that does not exist.
+    writeExperimentFile(dir() / "experiment.pb",
+                        utils::buildSimpleScene({.projectName = "block 1/run"}));
+
+    Runtime runtime(paths(), softwareRenderTargetFactory());
+    runtime.requestStop();
+    runtime.run();
+
+    const fs::path output = runtime.outputPath();
+    EXPECT_EQ(output.parent_path(), dir());
+    EXPECT_EQ(output.filename().string().rfind("block_1_run_", 0), 0U);
+    EXPECT_TRUE(fs::exists(output));
 }
 
 TEST_F(RuntimeFixture, RunWritesRecordingWithCsvHeader) {

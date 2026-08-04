@@ -3,7 +3,7 @@
 
 #include <concurrentqueue.h>
 
-#include <config/ExperimentConfig.hpp>
+#include <config/DeviceConfig.hpp>
 #include <functional>
 #include <memory>
 #include <stop_token>
@@ -16,6 +16,9 @@ class Renderer;
 struct EEGData;
 struct Marker;
 
+// Tag matches the other forward declarations in include/ (Scene, SceneObject,
+// Component). SDL declares it as a struct, so all four are technically
+// mismatched; changing one alone trips -Wmismatched-tags.
 class SDL_Renderer;
 
 struct RuntimePaths {
@@ -38,10 +41,16 @@ class Runtime {
     Runtime(Runtime&&)                 = delete;
     Runtime& operator=(Runtime&&)      = delete;
 
+    // Drives the experiment on the calling thread until the render loop ends
+    // (SDL_QUIT or requestStop), then stops the workers. Single-shot: the stop
+    // source is never re-armed, so a second run() returns immediately.
     void run();
 
+    // Safe to call from any thread, including while run() is in progress.
     void requestStop();
 
+    // Empty until run() has computed it. Not synchronized: read it before run()
+    // starts or after it has returned.
     const std::string& outputPath() const noexcept { return outputFilePath; }
 
     static RenderTargetFactory defaultRenderTargetFactory();
@@ -61,8 +70,8 @@ class Runtime {
     void        shutdown();
     std::string makeOutputPath() const;
 
-    RuntimePaths     paths;
-    ExperimentConfig config;
+    RuntimePaths paths;
+    DeviceConfig config;
 
     SdlSession sdlSession;
 

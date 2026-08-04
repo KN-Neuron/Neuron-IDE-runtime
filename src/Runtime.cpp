@@ -2,6 +2,7 @@
 
 #include <Runtime.hpp>
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <config/ConfigParser.hpp>
 #include <data_structures/EEGData.hpp>
@@ -26,6 +27,24 @@ constexpr const char* kDefaultTitle = "NeuronIDE";
 constexpr const char* kFallbackName = "experiment";
 
 std::string sdlError(const char* what) { return std::string(what) + ": " + SDL_GetError(); }
+
+// The experiment name comes from an authored protobuf file and ends up in a file
+// name, so anything that is not plainly safe becomes '_'. Left unfiltered, a name
+// like "block 1/run" would resolve to a missing subdirectory (and "../x" would
+// escape the output directory entirely).
+std::string sanitizeForFileName(std::string name) {
+    if (name.empty()) {
+        return kFallbackName;
+    }
+
+    std::replace_if(
+        name.begin(), name.end(),
+        [](unsigned char character) {
+            return std::isalnum(character) == 0 && character != '-' && character != '_';
+        },
+        '_');
+    return name;
+}
 }  // namespace
 
 Runtime::SdlSession::SdlSession() {
@@ -83,7 +102,7 @@ Runtime::Runtime(const RuntimePaths& paths, const RenderTargetFactory& renderTar
     auto formatStrategy = DataFormatStrategyFactory::create(config.output.format);
     outputExtension     = formatStrategy->fileExtension();
 
-    lslReader  = std::make_unique<LSLReader>(config.lsl);
+    lslReader  = std::make_unique<LSLReader>(config);
     dataWriter = std::make_unique<DataWriter>(std::move(formatStrategy));
     renderer   = std::make_unique<Renderer>(scene, sdlRenderer, markerQueue);
 }
@@ -91,11 +110,7 @@ Runtime::Runtime(const RuntimePaths& paths, const RenderTargetFactory& renderTar
 Runtime::~Runtime() { shutdown(); }
 
 std::string Runtime::makeOutputPath() const {
-    std::string name = scene->getExperimentName();
-    if (name.empty()) {
-        name = kFallbackName;
-    }
-    std::replace(name.begin(), name.end(), ' ', '_');
+    const std::string name = sanitizeForFileName(scene->getExperimentName());
 
     const auto now   = std::chrono::system_clock::now().time_since_epoch();
     const auto epoch = std::chrono::duration_cast<std::chrono::seconds>(now).count();

@@ -4,6 +4,7 @@
 #include <config/ChannelConfig.hpp>
 #include <config/ConfigVersion.hpp>
 #include <config/LSLConfig.hpp>
+#include <config/OutputConfig.hpp>
 #include <string>
 #include <vector>
 
@@ -36,7 +37,7 @@ struct DeviceConfig {
     GroundConfig               ground;           // ground
     std::vector<ChannelConfig> channels;         // channels
     ImpedanceConfig            impedance;        // impedance_check
-    // TODO: DataWriterConfig writer;  // EEG output file format strategy
+    OutputConfig               output;           // output
 
     // Checks every rule a device config must satisfy, including the cross-field
     // ones no single member can check (channel count matching the stream, unique
