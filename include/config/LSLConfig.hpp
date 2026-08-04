@@ -12,6 +12,10 @@ struct LSLConfig {
     std::string sourceId;  // lsl_stream.source_id
     int         expectedChannelCount = 0;
     double      expectedSampleRateHz = 0.0;
+
+    // Throws std::invalid_argument if the stream cannot be resolved or checked
+    // against with these values.
+    void validate() const;
 };
 
 #endif  // LSLCONFIG_HPP
