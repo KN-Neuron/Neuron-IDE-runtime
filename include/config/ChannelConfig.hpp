@@ -9,6 +9,11 @@ struct ChannelConfig {
     std::string label;
     bool        enabled = true;
     std::string unit;
+
+    // Throws std::invalid_argument if this channel breaks its own invariants.
+    // Rules that need the stream shape (index within range, uniqueness) belong
+    // to DeviceConfig::validate.
+    void validate() const;
 };
 
 #endif  // CHANNELCONFIG_HPP
