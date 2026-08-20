@@ -9,12 +9,6 @@ MarkerEmitterComponent::MarkerEmitterComponent(const std::shared_ptr<SceneObject
                                                std::vector<Binding>                bindings)
     : Component(owner), bindings(std::move(bindings)) {}
 
-MarkerEmitterComponent::~MarkerEmitterComponent() {
-    for (auto& sub : activeSubscriptions) {
-        sub.delegate->unsubscribe(sub.link.get());
-    }
-}
-
 void MarkerEmitterComponent::update(const Context& context) { (void)context; }
 
 void MarkerEmitterComponent::render(SDL_Renderer* renderer) { (void)renderer; }
@@ -24,9 +18,9 @@ void MarkerEmitterComponent::onSceneReady(Scene& scene) {
         auto& delegate = scene.resolveEvents(binding.targetObject, binding.targetEvent);
 
         auto link = std::make_unique<MarkerEventLink>(binding.markerName);
-        delegate.subscribe(link.get());
+        auto sub  = delegate.subscribe(link.get());
 
-        activeSubscriptions.push_back({std::move(link), &delegate});
+        activeSubscriptions.push_back({std::move(link), std::move(sub)});
     }
 }
 

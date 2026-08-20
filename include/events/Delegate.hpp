@@ -1,16 +1,17 @@
 #ifndef DELEGATE_HPP
 #define DELEGATE_HPP
 
-#include <algorithm>
-#include <vector>
+#include <cstddef>
+#include <memory>
 
 #include "events/EventListener.hpp"
+#include "events/Subscription.hpp"
 
 struct Context;
 
 class Delegate {
    public:
-    Delegate()  = default;
+    Delegate() : store(std::make_shared<ListenerStore>()) {}
     ~Delegate() = default;
 
     Delegate(const Delegate&)            = delete;
@@ -18,21 +19,20 @@ class Delegate {
     Delegate(Delegate&&)                 = delete;
     Delegate& operator=(Delegate&&)      = delete;
 
-    void subscribe(EventListener* listener) { listeners.push_back(listener); }
-
-    void unsubscribe(EventListener* listener) {
-        listeners.erase(std::remove(listeners.begin(), listeners.end(), listener), listeners.end());
+    Subscription subscribe(EventListener* listener) {
+        const std::size_t subscriptionId = store->nextId++;
+        store->listeners.push_back({listener, subscriptionId});
+        return Subscription(store, subscriptionId);
     }
 
     void invoke(const Context& ctx) {
-        for (auto* listener : listeners) {
-            listener->onEventTriggered(ctx);
+        for (const auto& entry : store->listeners) {
+            entry.listener->onEventTriggered(ctx);
         }
     }
 
    private:
-    // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
-    std::vector<EventListener*> listeners;
+    std::shared_ptr<ListenerStore> store;
 };
 
 #endif  // DELEGATE_HPP

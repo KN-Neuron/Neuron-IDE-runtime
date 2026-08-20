@@ -53,7 +53,7 @@ TEST(DelegateTest, SubscribeInvokesListener) {
     Delegate     delegate;
     MockListener listener;
 
-    delegate.subscribe(&listener);
+    auto                     subscription = delegate.subscribe(&listener);
     std::vector<std::string> markers;
     Context                  ctx{0.0, &markers};
     delegate.invoke(ctx);
@@ -61,16 +61,17 @@ TEST(DelegateTest, SubscribeInvokesListener) {
     EXPECT_EQ(listener.callCount, 1);
 }
 
-TEST(DelegateTest, UnsubscribeRemovesListener) {
-    Delegate     delegate;
-    MockListener listener;
-
-    delegate.subscribe(&listener);
-    delegate.unsubscribe(&listener);
+TEST(DelegateTest, DestroyingSubscriptionRemovesListener) {
+    Delegate                 delegate;
+    MockListener             listener;
     std::vector<std::string> markers;
     Context                  ctx{0.0, &markers};
-    delegate.invoke(ctx);
 
+    {
+        auto subscription = delegate.subscribe(&listener);
+    }
+
+    delegate.invoke(ctx);
     EXPECT_EQ(listener.callCount, 0);
 }
 
@@ -80,9 +81,9 @@ TEST(DelegateTest, MultipleListenersAllCalled) {
     MockListener listener2;
     MockListener listener3;
 
-    delegate.subscribe(&listener1);
-    delegate.subscribe(&listener2);
-    delegate.subscribe(&listener3);
+    auto                     subscription1 = delegate.subscribe(&listener1);
+    auto                     subscription2 = delegate.subscribe(&listener2);
+    auto                     subscription3 = delegate.subscribe(&listener3);
     std::vector<std::string> markers;
     Context                  ctx{0.0, &markers};
     delegate.invoke(ctx);
@@ -90,6 +91,20 @@ TEST(DelegateTest, MultipleListenersAllCalled) {
     EXPECT_EQ(listener1.callCount, 1);
     EXPECT_EQ(listener2.callCount, 1);
     EXPECT_EQ(listener3.callCount, 1);
+}
+
+TEST(DelegateTest, UnsubscribeAfterDelegateDestroyedIsNoOp) {
+    std::unique_ptr<Subscription> subscription;
+    MockListener                  listener;
+
+    {
+        Delegate delegate;
+        subscription = std::make_unique<Subscription>(delegate.subscribe(&listener));
+        // delegate (and its ListenerStore) destroyed here.
+    }
+
+    // The Subscription's destructor must tolerate its Delegate being gone.
+    EXPECT_NO_THROW(subscription.reset());
 }
 
 // ===================================================================
