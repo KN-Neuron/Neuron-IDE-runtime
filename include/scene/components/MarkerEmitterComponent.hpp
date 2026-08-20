@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "events/MarkerEventLink.hpp"
+#include "events/Subscription.hpp"
 #include "scene/components/Component.hpp"
 
-class Delegate;
 class Scene;
 
 namespace NeuronIDE {
@@ -25,7 +25,7 @@ class MarkerEmitterComponent : public Component {
 
     MarkerEmitterComponent(const std::shared_ptr<SceneObject>& owner,
                            std::vector<Binding>                bindings);
-    ~MarkerEmitterComponent() override;
+    ~MarkerEmitterComponent() override = default;
 
     MarkerEmitterComponent(const MarkerEmitterComponent&)            = delete;
     MarkerEmitterComponent& operator=(const MarkerEmitterComponent&) = delete;
@@ -41,8 +41,10 @@ class MarkerEmitterComponent : public Component {
 
    private:
     struct ActiveSubscription {
+        // Declaration order matters: the Subscription is destroyed first, unsubscribing before
+        // the listener it points to is freed.
         std::unique_ptr<MarkerEventLink> link;
-        Delegate*                        delegate = nullptr;
+        Subscription                     subscription;
     };
 
     std::vector<Binding>            bindings;
