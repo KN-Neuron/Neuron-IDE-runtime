@@ -67,9 +67,7 @@ TEST(DelegateTest, DestroyingSubscriptionRemovesListener) {
     std::vector<std::string> markers;
     Context                  ctx{0.0, &markers};
 
-    {
-        auto subscription = delegate.subscribe(&listener);
-    }
+    { auto subscription = delegate.subscribe(&listener); }
 
     delegate.invoke(ctx);
     EXPECT_EQ(listener.callCount, 0);
