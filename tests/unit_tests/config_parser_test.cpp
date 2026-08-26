@@ -161,6 +161,36 @@ TEST(ConfigParserTest, ParsesReferenceGroundAndImpedance) {
     EXPECT_DOUBLE_EQ(config.impedance.thresholdKohm, kImpedanceThreshold);
 }
 
+TEST(ConfigParserTest, ParsesOutputFormat) {
+    const std::string jsonText = R"json({
+      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
+      "lsl_stream": {
+        "name": "s", "type": "EEG", "source_id": "x",
+        "expected_channel_count": 1, "expected_sample_rate_hz": 250
+      },
+      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ],
+      "output": { "format": "csv" }
+    })json";
+    EXPECT_EQ(parseString(jsonText).output.format, "csv");
+}
+
+TEST(ConfigParserTest, OutputFormatDefaultsToCsvWhenSectionAbsent) {
+    EXPECT_EQ(parseString(kMinimalConfig).output.format, "csv");
+}
+
+TEST(ConfigParserTest, MissingOutputFormatFieldThrows) {
+    const std::string jsonText = R"json({
+      "config_version": "1.0", "device_name": "Dev", "montage_standard": "10-20",
+      "lsl_stream": {
+        "name": "s", "type": "EEG", "source_id": "x",
+        "expected_channel_count": 1, "expected_sample_rate_hz": 250
+      },
+      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ],
+      "output": { }
+    })json";
+    EXPECT_THROW(parseString(jsonText), std::invalid_argument);
+}
+
 TEST(ConfigParserTest, MissingLslStreamThrows) {
     const std::string jsonText = R"json({
       "config_version": "1.0",

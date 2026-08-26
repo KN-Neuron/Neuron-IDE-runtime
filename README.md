@@ -192,7 +192,7 @@ otherwise the same experiment stops being portable between labs.
 | Stimulus timing, trial structure, marker/event names        | Expected stream shape: channel count, sample rate                    |
 | Anything the editor authors and versions with the study     | Channel table: index, label, enabled, unit                           |
 |                                                             | Reference / ground electrodes, impedance check thresholds            |
-|                                                             | *(planned)* output file format for `DataWriter`                      |
+|                                                             | Output format for `DataWriter` (`output.format`)                     |
 
 Consequences of the split:
 
@@ -227,12 +227,16 @@ way — `channels` is a top-level key, so it is a top-level `DeviceConfig` field
     { "index": 1, "label": "Oz", "enabled": false, "unit": "microvolts" }
     // ... one entry per expected_channel_count, indices unique and in range
   ],
-  "impedance_check": { "supported": true, "threshold_kohm": 5.0 }
+  "impedance_check": { "supported": true, "threshold_kohm": 5.0 },
+  "output": { "format": "csv" }         // -> DataFormatStrategyFactory, defaults to csv
 }
 ```
 
 `config_version`, `device_name`, `montage_standard`, `lsl_stream` and `channels`
-are required; `reference`, `ground` and `impedance_check` default when absent.
+are required; `reference`, `ground`, `impedance_check` and `output` default when
+absent. If `output` is present it must carry a non-empty `format`; whether that
+format is *known* is decided by `DataFormatStrategyFactory` when the writer is
+built, not by config validation.
 Channels with `"enabled": false` stay in the config (they document the cap) but
 are **not** acquired: `LSLReader` drops them from every sample.
 
@@ -320,7 +324,8 @@ stay fatal — they are logged and the worker exits instead of retrying forever.
 | `ConfigParser`              | Implemented   | `config.json` → `DeviceConfig` (1:1 mapping, major-version checked, see §5), nlohmann/json |
 | Config `validate()`         | Implemented   | semantic rules on the config types themselves, independent of JSON (see §5) |
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
-| `Runtime` orchestration     | **Stub**      | currently does nothing |
+| `DataFormatStrategyFactory` | Implemented   | `output.format` → format strategy; unknown formats rejected  |
+| `Runtime` orchestration     | Implemented   | owns SDL session, parses both config files, wires the queues, drives the render loop, stops workers |
 
 The class diagram in older docs is partly aspirational; the table above reflects
 the actual code.

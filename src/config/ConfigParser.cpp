@@ -129,6 +129,14 @@ GroundConfig buildGround(const json& root) {
     return ground;
 }
 
+OutputConfig buildOutput(const json& root) {
+    OutputConfig output;
+    if (root.contains("output")) {
+        output.format = requireField<std::string>(root.at("output"), "format", "output");
+    }
+    return output;
+}
+
 ImpedanceConfig buildImpedance(const json& root) {
     ImpedanceConfig impedance;
     if (root.contains("impedance_check")) {
@@ -176,6 +184,7 @@ DeviceConfig ConfigParser::parseStream(std::istream& stream) {
         config.ground          = buildGround(root);
         config.channels        = buildChannels(root);
         config.impedance       = buildImpedance(root);
+        config.output          = buildOutput(root);
 
         // Mapping is done; the semantic rules belong to the types themselves.
         config.validate();

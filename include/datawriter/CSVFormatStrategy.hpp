@@ -15,6 +15,8 @@ class CSVFormatStrategy : public IDataFormatStrategy {
     CSVFormatStrategy(CSVFormatStrategy&&)                 = delete;
     CSVFormatStrategy& operator=(CSVFormatStrategy&&)      = delete;
 
+    std::string fileExtension() const override { return "csv"; }
+
     void open(const std::string& filepath) override;
     void close() override;
 

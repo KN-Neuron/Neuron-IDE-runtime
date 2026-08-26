@@ -16,6 +16,8 @@ class IDataFormatStrategy {
     IDataFormatStrategy(IDataFormatStrategy&&)                 = delete;
     IDataFormatStrategy& operator=(IDataFormatStrategy&&)      = delete;
 
+    virtual std::string fileExtension() const = 0;
+
     virtual void open(const std::string& filepath) = 0;
     virtual void close()                           = 0;
 
