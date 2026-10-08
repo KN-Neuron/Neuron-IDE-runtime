@@ -6,6 +6,11 @@
 #include "neuronide.pb.h"
 #include "scene/SceneObject.hpp"
 #include "scene/components/ComponentRegistry.hpp"
+
+namespace {
+constexpr double kTwoPi = 2.0 * M_PI;
+}  // namespace
+
 void BlinkComponent::setFrequency(double freq) { blinkFrequencyHz = freq; }
 
 std::unique_ptr<Component> BlinkComponent::createBlinker(
@@ -23,7 +28,7 @@ void BlinkComponent::update(const Context& context) {
         return;
     }
     elapsedTime += context.timestamp;
-    ownerPtr->isVisible = std::sin(2.0 * M_PI * blinkFrequencyHz * elapsedTime) >= 0.0;
+    ownerPtr->isVisible = std::sin(kTwoPi * blinkFrequencyHz * elapsedTime) >= 0.0;
 }
 
 void BlinkComponent::render(SDL_Renderer* renderer) {
