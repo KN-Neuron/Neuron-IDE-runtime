@@ -24,7 +24,6 @@ class BlinkComponent : public Component {
    private:
     double blinkFrequencyHz = 0.0;
     double elapsedTime      = 0.0;
-
 };
 
 #endif  // BLINKCOMPONENT_HPP
