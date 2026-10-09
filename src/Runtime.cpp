@@ -2,11 +2,9 @@
 
 #include <Runtime.hpp>
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <chrono>
 #include <config/ConfigParser.hpp>
-#include <ctime>
 #include <data_structures/EEGData.hpp>
 #include <data_structures/Marker.hpp>
 #include <datawriter/DataFormatStrategyFactory.hpp>
@@ -14,6 +12,7 @@
 #include <datawriter/IDataFormatStrategy.hpp>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <lslreader/LSLReader.hpp>
 #include <memory>
@@ -28,11 +27,9 @@
 namespace {
 namespace fs = std::filesystem;
 
-constexpr const char* kDefaultTitle    = "NeuronIDE";
-constexpr const char* kFallbackName    = "experiment";
-constexpr const char* kTimestampFormat = "%Y%m%dT%H%M%S";  // e.g. 20261009T143012
+constexpr const char* kDefaultTitle = "NeuronIDE";
+constexpr const char* kFallbackName = "experiment";
 
-constexpr std::size_t kTimestampBufferSize = 32;
 // How often the window's events are handled while waiting for the EEG stream.
 constexpr auto kEventPollInterval = std::chrono::milliseconds(50);
 
@@ -56,16 +53,12 @@ std::string sanitizeForFileName(std::string name) {
     return name;
 }
 
-// Local wall-clock time, as a researcher reads it when looking for a session.
+// Local wall-clock time, as a researcher reads it when looking for a session,
+// e.g. "20261009T143012".
 std::string localTimestamp() {
-    const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::tm           local{};
-    localtime_r(&now, &local);
-
-    std::array<char, kTimestampBufferSize> buffer{};
-    const std::size_t                      length =
-        std::strftime(buffer.data(), buffer.size(), kTimestampFormat, &local);
-    return {buffer.data(), length};
+    const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
+    return std::format("{:%Y%m%dT%H%M%S}",
+                       std::chrono::zoned_time{std::chrono::current_zone(), now});
 }
 
 std::string describe(const std::exception_ptr& error) {
@@ -239,7 +232,8 @@ bool Runtime::awaitAcquisition() {
             throw std::runtime_error(
                 "Runtime: EEG stream '" + config.lsl.name + "' delivered no samples within " +
                 std::to_string(
-                    std::chrono::duration_cast<std::chrono::milliseconds>(acquisitionTimeout).count()) +
+                    std::chrono::duration_cast<std::chrono::milliseconds>(acquisitionTimeout)
+                        .count()) +
                 " ms; the experiment was not started");
         }
 

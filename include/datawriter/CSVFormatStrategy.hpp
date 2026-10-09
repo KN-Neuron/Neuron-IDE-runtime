@@ -1,8 +1,8 @@
 #ifndef CSVFORMATSTRATEGY_HPP
 #define CSVFORMATSTRATEGY_HPP
 
+#include <datawriter/ExclusiveOutputFile.hpp>
 #include <datawriter/IDataFormatStrategy.hpp>
-#include <fstream>
 #include <string>
 
 class CSVFormatStrategy : public IDataFormatStrategy {
@@ -25,7 +25,7 @@ class CSVFormatStrategy : public IDataFormatStrategy {
     void writeMarker(const Marker& marker) override;
 
    private:
-    std::ofstream outputFile;
+    ExclusiveOutputFile outputFile;
 };
 
 #endif  // CSVFORMATSTRATEGY_HPP

@@ -2,6 +2,7 @@ add_library(datawriter OBJECT
     CSVFormatStrategy.cpp
     DataFormatStrategyFactory.cpp
     DataWriter.cpp
+    ExclusiveOutputFile.cpp
 )
 
 target_include_directories(datawriter PUBLIC 
