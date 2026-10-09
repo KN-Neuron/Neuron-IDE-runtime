@@ -18,8 +18,9 @@ You are in the **runtime** repo. Read the system overview below first.
   the `.neuroz` proto vs the device `config.json`) before adding settings.
 - Inputs: the `.neuroz` comes from the backend export (`POST /api/v0/projects/export/{id}`); the
   device `config.json` is written by the launcher, which starts the runtime with `[config.json] <experiment.neuroz>`
-  (#31). It also needs an output-folder argument and distinct exit codes (runtime#37). Exit
-  codes are part of that contract: the launcher shows them to the experimenter.
+  (#31). The output folder comes from `config.json` (`output.directory`), which the launcher
+  sets to each run's own folder; distinct exit codes are part of the same contract, because
+  the launcher shows them to the experimenter (both in runtime#37).
 - `config.json` is also produced by the launcher (Python). Changing its keys or validation rules
   is a cross-team change: bump `config_version` and tell the launcher team.
 
@@ -73,8 +74,8 @@ frontend ──JSON /api/v0/*──▶ backend ──.neuroz (+ form.json)──
 Steps: experiment → subject → session → device → electrodes → signal check → run (and "run
 again"). Data lives in `<data root>/<experiment>/subjects/S001/sessions/001/runs/01/`.
 Subjects' form answers are **personal data** and live only in the experiment's `subjects.csv`,
-never in folder names, recordings or logs. For each run it writes `config.json` and starts the
-runtime (CLI: runtime#31 + runtime#37), which records EEG + markers into the run folder. Tasks: epic
+never in folder names, recordings or logs. For each run it writes `config.json` (with `output.directory` = the run folder) and starts
+the runtime (runtime#31, runtime#37), which records EEG + markers into that folder. Tasks: epic
 launcher#1.
 
 ### Backend HTTP API (base `/api/v0`, Swagger at `http://localhost:8000/docs`)
@@ -102,8 +103,8 @@ launcher#1.
 - Auth is a placeholder (frontend#57, backend#14).
 - Subject form has no format yet (frontend#64).
 - Runtime main loop and CLI `NeuronIDE [config.json] <experiment.neuroz>` are still in review
-  (runtime#31). The launcher also needs an output-folder argument and distinct exit codes
-  (runtime#37).
+  (runtime#31). The launcher also needs `output.directory` in `config.json` and distinct exit
+  codes (runtime#37).
 
 ### Working across repos
 
