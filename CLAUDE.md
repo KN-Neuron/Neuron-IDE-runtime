@@ -22,20 +22,39 @@ You are in the **runtime** repo. Read the system overview below first.
 
 Neuron IDE (KN-Neuron, university research group) is an IDE for building EEG/BCI experiments
 (SSVEP, visual/text/audio stimuli, LSL markers). It is split across three repos, owned by three
-teams. **This repo is one of them — your change may break the other two.**
+teams, plus a planned fourth component (the launcher). **This repo is one of them — your change
+may break the others.**
 
 | Repo | Team owns | Stack | Role |
 |---|---|---|---|
 | [Neuron-IDE-frontend](https://github.com/KN-Neuron/Neuron-IDE-frontend) | Frontend | React 19 + Vite, JS (no TS), @xyflow/react | Editor UI: scene canvas, experiment flow graph, inspector, EEG device picker |
 | [Neuron-IDE-backend](https://github.com/KN-Neuron/Neuron-IDE-backend) | Backend | Python 3.13, FastAPI, SQLModel, Postgres 16, Alembic | Users/auth, project storage, `.neuroz` import/export |
 | [Neuron-IDE-runtime](https://github.com/KN-Neuron/Neuron-IDE-runtime) | Runtime | C++17, CMake, SDL2, LSL, protobuf | Loads a `.neuroz` scene and runs the experiment (rendering, timing, LSL markers) |
+| Launcher — **planned, repo not created yet** | TBD | TBD | Pre-run program, see below |
 
 ### Data flow
 
 ```
-frontend ──JSON over HTTP /api/v0/*──▶ backend ──.neuroz (protobuf Scene bytes)──▶ runtime
- (edits scene)                          (stores scene objects as protobuf blobs)     (parses & runs)
+frontend ──JSON /api/v0/*──▶ backend ──.neuroz──▶ launcher ──device + form answers + .neuroz──▶ runtime
+ (designs scene,             (stores           (connects EEG, checks          (runs experiment)
+  flow & form)                projects)          electrodes, fills form)
 ```
+
+### Launcher (planned, 4th component, owner TBD)
+
+A separate program run by the experimenter **before** the runtime starts. It:
+1. discovers and connects to EEG devices (via LSL),
+2. shows electrode status / impedance so wrong or bad electrodes are caught before recording,
+3. lets the experimenter pick the device the experiment will use,
+4. collects the **experiment form**. By default that means metadata: patient ID, age, experiment
+   name, notes (see frontend `BLOCK_CONFIGS.experimentStart`). The form is **fully custom**:
+   researchers design its fields in the frontend editor, it is saved with the project, and the
+   launcher renders whatever was designed.
+
+Then it starts the runtime with the selected device and the form answers. Answers must end up
+stored alongside the recorded data. Frontend `src/features/eeg/` (DeviceSelector, ElectrodeHead)
+currently mocks parts of this inside the editor. Don't build more of that in the IDE without
+agreeing where it belongs.
 
 ### The contract: `neuronide.proto` (single most important file)
 
@@ -73,12 +92,16 @@ frontend ──JSON over HTTP /api/v0/*──▶ backend ──.neuroz (protobuf
   proto `SceneObject` (`transform` + `components`). No `color`/`lslMarker` in the proto yet.
 - The frontend experiment flow graph (blocks: trial, pause, stimuli, LSL markers, responses)
   has **no representation in the proto** — it is not saved by the backend nor run by the runtime.
+- **Custom form has no contract yet.** The proto needs a form definition (field list: id,
+  label, type, required, options) in `Scene`/project, plus a format for answers passed
+  launcher → runtime and saved with recordings. Needs frontend + backend + runtime + launcher.
+- How the launcher hands off to the runtime (CLI args, file, IPC) is not decided.
 - Runtime `Runtime::start()` is a stub; only the parser + BlinkComponent exist so far.
 
 ### Working across repos
 
 Teams usually clone the repos side by side (`../Neuron-IDE-frontend`, `../Neuron-IDE-backend`,
-`../Neuron-IDE-runtime`). **If a sibling repo is present, read its actual code instead of
+`../Neuron-IDE-runtime`, launcher TBD). **If a sibling repo is present, read its actual code instead of
 trusting this summary.** If it isn't, ask the user or check GitHub before assuming how the other
 side behaves. When a change touches the proto, the API shape, or the `.neuroz` format, tell the
 user explicitly which other team(s) must be informed.
