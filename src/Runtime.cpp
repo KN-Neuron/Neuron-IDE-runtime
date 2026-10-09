@@ -239,8 +239,8 @@ bool Runtime::awaitAcquisition() {
             throw std::runtime_error(
                 "Runtime: EEG stream '" + config.lsl.name + "' delivered no samples within " +
                 std::to_string(
-                    std::chrono::duration_cast<std::chrono::seconds>(acquisitionTimeout).count()) +
-                " s; the experiment was not started");
+                    std::chrono::duration_cast<std::chrono::milliseconds>(acquisitionTimeout).count()) +
+                " ms; the experiment was not started");
         }
 
         switch (
