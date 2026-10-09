@@ -102,3 +102,35 @@ TEST(CSVFormatStrategyTest, OpenRefusesToOverwriteAnExistingFile) {
 
     fs::remove(filePath);
 }
+
+TEST(CSVFormatStrategyTest, WritesThroughTheCreatedFileEvenIfThePathIsReplaced) {
+#ifdef _WIN32
+    GTEST_SKIP() << "Windows does not allow renaming a file that is open";
+#endif
+    const auto filePath  = makeTempFilePath("csv_swapped");
+    const auto movedPath = fs::path(filePath).replace_extension(".moved.csv");
+
+    CSVFormatStrategy strategy;
+    strategy.open(filePath.string());
+
+    // Another process moves our file away and puts its own under the same name.
+    fs::rename(filePath, movedPath);
+    {
+        std::ofstream other(filePath);
+        other << "other recording\n";
+    }
+
+    strategy.writeHeader();
+    strategy.close();
+
+    const auto otherLines = readAllLines(filePath);
+    ASSERT_EQ(otherLines.size(), 1U);
+    EXPECT_EQ(otherLines.front(), "other recording") << "the other file must not be touched";
+
+    const auto ownLines = readAllLines(movedPath);
+    ASSERT_EQ(ownLines.size(), 1U);
+    EXPECT_EQ(ownLines.front(), "type,timestamp,payload");
+
+    fs::remove(filePath);
+    fs::remove(movedPath);
+}

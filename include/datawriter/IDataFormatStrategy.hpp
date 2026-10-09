@@ -19,7 +19,8 @@ class IDataFormatStrategy {
     virtual std::string fileExtension() const = 0;
 
     // Creates `filepath` for writing. Must throw rather than overwrite an
-    // existing file: a truncated recording cannot be recovered.
+    // existing file - a truncated recording cannot be recovered - and must
+    // write through the handle that created it (see ExclusiveOutputFile).
     virtual void open(const std::string& filepath) = 0;
     virtual void close()                           = 0;
 
