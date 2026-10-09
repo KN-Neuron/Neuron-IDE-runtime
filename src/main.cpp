@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
 
     if (args.size() == 2) {
         paths.experiment = args[1];
-    } else if (args.size() >= 3) {
+    } else if (args.size() == 3) {
         paths.config     = args[1];
         paths.experiment = args[2];
     } else {
