@@ -125,6 +125,23 @@ TEST(ConfigValidationTest, NegativeImpedanceThresholdThrows) {
     EXPECT_THROW(config.validate(), std::invalid_argument);
 }
 
+TEST(ConfigValidationTest, NegativeDisplayIndexThrows) {
+    DeviceConfig config  = makeValidConfig();
+    config.display.index = -1;
+
+    EXPECT_THROW(config.validate(), std::invalid_argument);
+}
+
+TEST(ConfigValidationTest, NonPositiveWindowSizeThrows) {
+    DeviceConfig config  = makeValidConfig();
+    config.display.width = 0;
+    EXPECT_THROW(config.validate(), std::invalid_argument);
+
+    config                = makeValidConfig();
+    config.display.height = -1;
+    EXPECT_THROW(config.validate(), std::invalid_argument);
+}
+
 TEST(ConfigValidationTest, EmptyOutputFormatThrows) {
     DeviceConfig config = makeValidConfig();
     config.output.format.clear();

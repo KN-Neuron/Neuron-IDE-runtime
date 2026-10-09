@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -81,6 +82,23 @@ TEST(DataWriterTest, FlushesEegAndMarkerRecords) {
     EXPECT_EQ(lines[0], "type,timestamp,payload");
     EXPECT_EQ(lines[1], "eeg,12.5,\"1.25,2.5,3.75\"");
     EXPECT_EQ(lines[2], "marker,13.25,\"stimulus_on\"");
+
+    fs::remove(filePath);
+}
+
+TEST(CSVFormatStrategyTest, OpenRefusesToOverwriteAnExistingFile) {
+    const auto filePath = makeTempFilePath("csv_existing");
+    {
+        std::ofstream existing(filePath);
+        existing << "earlier recording\n";
+    }
+
+    CSVFormatStrategy strategy;
+    EXPECT_THROW(strategy.open(filePath.string()), std::runtime_error);
+
+    const auto lines = readAllLines(filePath);
+    ASSERT_EQ(lines.size(), 1U);
+    EXPECT_EQ(lines.front(), "earlier recording");
 
     fs::remove(filePath);
 }

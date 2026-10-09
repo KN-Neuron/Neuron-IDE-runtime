@@ -30,6 +30,12 @@ T requireField(const json& obj, const char* key, std::string_view ctx) {
     return requireMember(obj, key, ctx)->get<T>();
 }
 
+template <typename T>
+T optionalField(const json& obj, const char* key, const T& fallback) {
+    const auto member = obj.find(key);
+    return member == obj.end() ? fallback : member->get<T>();
+}
+
 bool toUnsigned(std::string_view text, int& out) {
     const bool digitsOnly =
         !text.empty() && std::all_of(text.begin(), text.end(), [](unsigned char character) {
@@ -137,6 +143,23 @@ OutputConfig buildOutput(const json& root) {
     return output;
 }
 
+// Unlike the other optional sections, every key in `display` is optional on its
+// own: `{ "index": 1 }` alone is a complete statement ("fullscreen on monitor 1").
+DisplayConfig buildDisplay(const json& root) {
+    DisplayConfig display;
+    if (root.contains("display")) {
+        const json& displayJson = root.at("display");
+        if (!displayJson.is_object()) {
+            throw std::invalid_argument("ConfigParser: 'display' must be an object");
+        }
+        display.index      = optionalField(displayJson, "index", display.index);
+        display.fullscreen = optionalField(displayJson, "fullscreen", display.fullscreen);
+        display.width      = optionalField(displayJson, "width", display.width);
+        display.height     = optionalField(displayJson, "height", display.height);
+    }
+    return display;
+}
+
 ImpedanceConfig buildImpedance(const json& root) {
     ImpedanceConfig impedance;
     if (root.contains("impedance_check")) {
@@ -184,6 +207,7 @@ DeviceConfig ConfigParser::parseStream(std::istream& stream) {
         config.ground          = buildGround(root);
         config.channels        = buildChannels(root);
         config.impedance       = buildImpedance(root);
+        config.display         = buildDisplay(root);
         config.output          = buildOutput(root);
 
         // Mapping is done; the semantic rules belong to the types themselves.
