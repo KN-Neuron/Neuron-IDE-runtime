@@ -14,59 +14,68 @@ You are in the **runtime** repo. Read the system overview below first.
   entry must exist first — which means a backend change too.
 - Test scenes: write `.pbtxt`, then
   `protoc --encode=NeuronIDE.Scene protoFiles/neuronide.proto < x.pbtxt > x.pb`.
-- Files the runtime receives are exported by the backend (`POST /api/v0/projects/export/{id}`).
+- Read README §3 (architecture: Renderer / LSLReader / DataWriter threads) and §5 (what goes in
+  the `.neuroz` proto vs the device `config.json`) before adding settings.
+- Inputs: the `.neuroz` comes from the backend export (`POST /api/v0/projects/export/{id}`); the
+  device `config.json` is written by the launcher, which starts the runtime once it accepts
+  command-line arguments (runtime#37). Exit codes are part of that contract: the launcher shows
+  them to the experimenter.
+- `config.json` is also produced by the launcher (Python). Changing its keys or validation rules
+  is a cross-team change: bump `config_version` and tell the launcher team.
 
-<!-- BEGIN SHARED: Neuron IDE system overview. Keep this block IDENTICAL in all three repos
-     (Neuron-IDE-frontend, Neuron-IDE-backend, Neuron-IDE-runtime). Change it in one, copy to all. -->
+<!-- BEGIN SHARED: Neuron IDE system overview. Keep this block IDENTICAL in all four repos
+     (Neuron-IDE-frontend, -backend, -runtime, -launcher). Change it in one, copy to all. -->
 ## Neuron IDE — the whole system
 
 Neuron IDE (KN-Neuron, university research group) is an IDE for building EEG/BCI experiments
-(SSVEP, visual/text/audio stimuli, LSL markers). It is split across three repos, owned by three
-teams, plus a planned fourth component (the launcher). **This repo is one of them — your change
-may break the others.**
+(SSVEP, visual/text/audio stimuli, LSL markers). It is split across four repos, owned by
+different teams. **This repo is one of them — your change may break the others.**
 
 | Repo | Team owns | Stack | Role |
 |---|---|---|---|
-| [Neuron-IDE-frontend](https://github.com/KN-Neuron/Neuron-IDE-frontend) | Frontend | React 19 + Vite, JS (no TS), @xyflow/react | Editor UI: scene canvas, experiment flow graph, inspector, EEG device picker |
+| [Neuron-IDE-frontend](https://github.com/KN-Neuron/Neuron-IDE-frontend) | Frontend | React 19 + Vite, JS (no TS), @xyflow/react | Editor UI: scene canvas, experiment flow graph, inspector |
 | [Neuron-IDE-backend](https://github.com/KN-Neuron/Neuron-IDE-backend) | Backend | Python 3.13, FastAPI, SQLModel, Postgres 16, Alembic | Users/auth, project storage, `.neuroz` import/export |
-| [Neuron-IDE-runtime](https://github.com/KN-Neuron/Neuron-IDE-runtime) | Runtime | C++17, CMake, SDL2, LSL, protobuf | Loads a `.neuroz` scene and runs the experiment (rendering, timing, LSL markers) |
-| Launcher — **planned, repo not created yet** | TBD | TBD | Pre-run program, see below |
+| [Neuron-IDE-launcher](https://github.com/KN-Neuron/Neuron-IDE-launcher) | TBD | Python 3.13, PySide6 (Qt), pyqtgraph, pylsl, numpy | Lab-PC app: experiments/subjects/sessions/runs, device + electrodes, signal check, starts runtime |
+| [Neuron-IDE-runtime](https://github.com/KN-Neuron/Neuron-IDE-runtime) | Runtime | C++17, CMake, SDL2, LSL, protobuf | Runs the experiment: rendering, timing, LSL markers, records EEG |
 
 ### Data flow
 
 ```
-frontend ──JSON /api/v0/*──▶ backend ──.neuroz──▶ launcher ──device + form answers + .neuroz──▶ runtime
- (designs scene,             (stores           (connects EEG, checks          (runs experiment)
-  flow & form)                projects)          electrodes, fills form)
+frontend ──JSON /api/v0/*──▶ backend ──.neuroz (+ form.json)──▶ launcher ──.neuroz + config.json──▶ runtime
+ (designs scene,              (stores                           (subjects, device,                 (runs, records
+  flow & subject form)         projects)                         electrodes, signal check)          into run folder)
 ```
 
-### Launcher (planned, 4th component, owner TBD)
+### The two runtime inputs (runtime README §5)
 
-A separate program run by the experimenter **before** the runtime starts. It:
-1. discovers and connects to EEG devices (via LSL),
-2. shows electrode status / impedance so wrong or bad electrodes are caught before recording,
-3. lets the experimenter pick the device the experiment will use,
-4. collects the **experiment form**. By default that means metadata: patient ID, age, experiment
-   name, notes (see frontend `BLOCK_CONFIGS.experimentStart`). The form is **fully custom**:
-   researchers design its fields in the frontend editor, it is saved with the project, and the
-   launcher renders whatever was designed.
+- **`.neuroz`** = serialized `NeuronIDE.Scene` (protobuf): **what the experiment does**.
+  Authored in the editor, stored and exported by the backend.
+- **`config.json`** = device config (JSON, `config_version` 1.x): **what the hardware is**:
+  LSL stream identity, channel table (index, label, enabled, unit), reference, ground.
+  Produced by the launcher's device + electrode steps.
+- Rule for new fields: if it changes the experiment's meaning for analysis → proto; if it only
+  changes how this machine acquires or stores data → `config.json`.
+- The **subject form** is neither: it's a separate `form.json` designed in the editor and used
+  only by the launcher (epic frontend#63). It is not in the proto and the runtime never sees it.
 
-Then it starts the runtime with the selected device and the form answers. Answers must end up
-stored alongside the recorded data. Frontend `src/features/eeg/` (DeviceSelector, ElectrodeHead)
-currently mocks parts of this inside the editor. Don't build more of that in the IDE without
-agreeing where it belongs.
+### The proto contract: `neuronide.proto`
 
-### The contract: `neuronide.proto` (single most important file)
-
-- Defines `NeuronIDE.Scene` → `SceneObject` (name, is_visible, `Transform`, `Component`s).
-  `Component` is a `oneof`: `renderer` (SpriteRenderer), `text` (TextRenderer),
-  `blinker` (BlinkComponent), `script` (ScriptComponent).
-- **Copies live in two repos and must stay byte-identical:**
-  backend `app/domain/neuronide.proto` and runtime `protoFiles/neuronide.proto`.
-- A `.neuroz` file = a serialized `NeuronIDE.Scene`. Backend exports it, runtime parses it.
+- `Scene` → `SceneObject` (name, is_visible, `Transform`, `Component`s). `Component` is a
+  `oneof`: `renderer`, `text`, `blinker`, `script`, `marker_emitter` (runtime only so far).
+- **Copies live in several repos and must stay byte-identical:** backend
+  `app/domain/neuronide.proto`, runtime `protoFiles/neuronide.proto`, and the launcher.
 - Changing the proto = cross-team change. Add fields with new numbers; never renumber or reuse
   field numbers. Update: backend proto + regenerate `neuronide_pb2.py` + `app/domain/` dataclasses,
-  runtime proto + component class + `REGISTER_COMPONENT`, frontend inspector/scene editor.
+  runtime proto + component class + `REGISTER_COMPONENT`, launcher copy, frontend editor.
+
+### Launcher (lab PC, before the runtime)
+
+Steps: experiment → subject → session → device → electrodes → signal check → run (and "run
+again"). Data lives in `<data root>/<experiment>/subjects/S001/sessions/001/runs/01/`.
+Subjects' form answers are **personal data** and live only in the experiment's `subjects.csv`,
+never in folder names, recordings or logs. For each run it writes `config.json` and starts the
+runtime (CLI: runtime#37), which records EEG + markers into the run folder. Tasks: epic
+launcher#1.
 
 ### Backend HTTP API (base `/api/v0`, Swagger at `http://localhost:8000/docs`)
 
@@ -74,7 +83,8 @@ agreeing where it belongs.
 - `GET /projects/`, `GET /projects/{id}`, `POST /projects/save`, `PUT /projects/{id}`,
   `POST /projects/export/{id}` (→ `.neuroz` bytes), `POST /projects/import` (multipart `.neuroz`)
 - Project endpoints require `Authorization: Bearer <token>`. Auth is a **placeholder**:
-  login `testuser`/`testpass` returns `fake_access_token`. Keycloak is planned (`app/auth/`).
+  login `testuser`/`testpass` returns `fake_access_token`.
+- Frontend calls these via `src/utils/api.js` (Vite proxies `/api` → `localhost:8000` in dev).
 - Project JSON = the proto shape in JSON; components are discriminated by `component_type`:
   ```json
   {"description": "…", "project": {"project_name": "Demo", "scene_objects": [
@@ -83,26 +93,23 @@ agreeing where it belongs.
      "components": [{"component_type": "blinker", "blink_frequency_hz": 15.0}]}]}}
   ```
 
-### Known integration gaps (as of 2026-10-09 — fix them or update this list)
+### Known cross-repo gaps (as of 2026-10-09 — fix them or update this list)
 
-- Frontend calls `/api/projects`; backend serves `/api/v0/projects/`. No Vite dev proxy is
-  configured, so the frontend silently falls back to hardcoded mock projects.
-- Frontend expects `{ projects: [...] }`; backend `GET /projects/` returns a bare list.
-- Frontend scene objects (`x, y, w, h, color, type: "rect"|"text", lslMarker`) don't match the
-  proto `SceneObject` (`transform` + `components`). No `color`/`lslMarker` in the proto yet.
-- The frontend experiment flow graph (blocks: trial, pause, stimuli, LSL markers, responses)
-  has **no representation in the proto** — it is not saved by the backend nor run by the runtime.
-- **Custom form has no contract yet.** The proto needs a form definition (field list: id,
-  label, type, required, options) in `Scene`/project, plus a format for answers passed
-  launcher → runtime and saved with recordings. Needs frontend + backend + runtime + launcher.
-- How the launcher hands off to the runtime (CLI args, file, IPC) is not decided.
-- Runtime `Runtime::start()` is a stub; only the parser + BlinkComponent exist so far.
+- Proto copies have diverged: backend lacks `MarkerEmitterComponent` (backend#23).
+- Experiment flow graph is not in the proto, so it isn't saved, exported or run (epic frontend#59).
+- Scene object color and LSL marker are not persisted (frontend#56, backend#24).
+- Media files (images, audio, scripts) can't be uploaded, so the runtime can't find them (backend#25).
+- Auth is a placeholder (frontend#57, backend#14).
+- Subject form has no format yet (frontend#64).
+- Runtime ignores command-line arguments, so the launcher can't start it yet (runtime#37);
+  `Runtime::start()` is a stub until the main loop lands (runtime#15).
 
 ### Working across repos
 
 Teams usually clone the repos side by side (`../Neuron-IDE-frontend`, `../Neuron-IDE-backend`,
-`../Neuron-IDE-runtime`, launcher TBD). **If a sibling repo is present, read its actual code instead of
-trusting this summary.** If it isn't, ask the user or check GitHub before assuming how the other
-side behaves. When a change touches the proto, the API shape, or the `.neuroz` format, tell the
-user explicitly which other team(s) must be informed.
+`../Neuron-IDE-launcher`, `../Neuron-IDE-runtime`). **If a sibling repo is present, read its
+actual code instead of trusting this summary.** If it isn't, ask the user or check GitHub before
+assuming how the other side behaves. When a change touches the proto, `config.json`, the subject
+form JSON, the API shape or the `.neuroz` format, tell the user which other team(s) must be
+informed.
 <!-- END SHARED -->
