@@ -1,9 +1,12 @@
 #include "lslreader/LSLReader.hpp"
 
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <data_structures/EEGData.hpp>
+#include <exception>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -108,15 +111,25 @@ LSLReader::LSLReader(DeviceConfig deviceConfig)
 
 LSLReader::~LSLReader() { stop(); }
 
-void LSLReader::start(std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>> eegQueue) {
+void LSLReader::start(std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>> eegQueue,
+                      FailureCallback                                       onFailure) {
     stop();
 
-    this->eegQueue = std::move(eegQueue);
-    readerThread   = std::jthread([this](const std::stop_token& stopToken) {
+    this->eegQueue  = std::move(eegQueue);
+    this->onFailure = std::move(onFailure);
+    {
+        const std::scoped_lock lock(stateMutex);
+        failureReason = nullptr;
+        currentState  = AcquisitionState::Resolving;
+    }
+    stateChanged.notify_all();
+
+    readerThread = std::jthread([this](const std::stop_token& stopToken) {
         try {
             readLoop(stopToken);
         } catch (const std::exception& e) {
             std::cerr << "LSLReader: fatal error, stopping acquisition: " << e.what() << "\n";
+            fail(std::current_exception());
         }
     });
 }
@@ -128,10 +141,59 @@ void LSLReader::stop() {
     if (readerThread.joinable()) {
         readerThread.join();
     }
+
+    {
+        const std::scoped_lock lock(stateMutex);
+        if (currentState != AcquisitionState::Failed) {
+            currentState = AcquisitionState::Idle;
+        }
+    }
+    stateChanged.notify_all();
+}
+
+AcquisitionState LSLReader::state() const {
+    const std::scoped_lock lock(stateMutex);
+    return currentState;
+}
+
+AcquisitionState LSLReader::waitWhileResolving(std::chrono::steady_clock::time_point deadline,
+                                               const std::stop_token& stopToken) const {
+    std::unique_lock lock(stateMutex);
+    stateChanged.wait_until(lock, stopToken, deadline,
+                            [this] { return currentState != AcquisitionState::Resolving; });
+    return currentState;
+}
+
+std::exception_ptr LSLReader::failure() const {
+    const std::scoped_lock lock(stateMutex);
+    return failureReason;
+}
+
+void LSLReader::setState(AcquisitionState next) {
+    {
+        const std::scoped_lock lock(stateMutex);
+        currentState = next;
+    }
+    stateChanged.notify_all();
+}
+
+void LSLReader::fail(std::exception_ptr reason) {
+    {
+        const std::scoped_lock lock(stateMutex);
+        failureReason = std::move(reason);
+        currentState  = AcquisitionState::Failed;
+    }
+    stateChanged.notify_all();
+
+    if (onFailure) {
+        onFailure();
+    }
 }
 
 void LSLReader::readLoop(const std::stop_token& stopToken) {
     while (!stopToken.stop_requested()) {
+        setState(AcquisitionState::Resolving);
+
         const std::optional<lsl::stream_info> info = resolveStream(config.lsl, stopToken);
         if (!info.has_value()) {
             return;  // stop requested while waiting for the cap
@@ -144,6 +206,7 @@ void LSLReader::readLoop(const std::stop_token& stopToken) {
                                      lsl::post_monotonize);
 
             std::vector<double> sample;
+            bool                streaming = false;
             while (!stopToken.stop_requested()) {
                 const double timestamp = inlet.pull_sample(sample, kPullTimeout);
                 if (timestamp == 0.0) {
@@ -155,6 +218,13 @@ void LSLReader::readLoop(const std::stop_token& stopToken) {
                 } else {
                     eegQueue->enqueue(
                         EEGData{timestamp, pickChannels(sample, enabledChannelIndices)});
+                }
+
+                // Reported on the first queued sample, not on resolve: a stream
+                // that resolves but never delivers is not acquiring anything.
+                if (!streaming) {
+                    streaming = true;
+                    setState(AcquisitionState::Streaming);
                 }
             }
         } catch (const lsl::lost_error& e) {

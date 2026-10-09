@@ -1,6 +1,7 @@
 #include <concurrentqueue.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <config/ChannelConfig.hpp>
 #include <config/DeviceConfig.hpp>
@@ -11,9 +12,11 @@
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <stop_token>
 #include <streambuf>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "lsl_cpp.h"
@@ -32,6 +35,7 @@ constexpr auto   kSubscribePoll        = std::chrono::milliseconds(20);
 constexpr double kRecoveryValue        = 42.0;
 
 constexpr auto kValidationWait = std::chrono::milliseconds(1500);
+constexpr auto kStateWait      = std::chrono::seconds(10);
 
 class ScopedStreamRedirect {
    public:
@@ -134,6 +138,22 @@ std::string runAndCaptureDiagnostics(const DeviceConfig& config, int channelCoun
     EEGData received;
     EXPECT_FALSE(eegQueue->try_dequeue(received)) << "a rejected stream must yield no samples";
     return captured.str();
+}
+
+// Starts the reader with its diagnostics silenced, waits while it resolves, and
+// stops it. Returns the state the wait ended on.
+AcquisitionState startWaitAndStop(
+    LSLReader& reader, const std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>>& eegQueue,
+    LSLReader::FailureCallback onFailure) {
+    std::ostringstream         captured;
+    const ScopedStreamRedirect redirect(std::cerr, captured.rdbuf());
+
+    reader.start(eegQueue, std::move(onFailure));
+    const std::stop_source neverStopped;
+    const AcquisitionState reached = reader.waitWhileResolving(
+        std::chrono::steady_clock::now() + kStateWait, neverStopped.get_token());
+    reader.stop();
+    return reached;
 }
 
 // Keeps pushing a marked sample until one of them comes back through the queue,
@@ -302,4 +322,79 @@ TEST(LSLReaderTest, StopBeforeStreamResolvedExitsCleanly) {
 
 TEST(LSLReaderTest, DestroyingUnstartedReaderIsSafe) {
     EXPECT_NO_THROW({ const LSLReader reader(makeConfig()); });
+}
+
+TEST(LSLReaderTest, IsIdleUntilStartedAndResolvingRightAfterStart) {
+    DeviceConfig config = makeConfig();
+    config.lsl.name     = "neuronide_test_state_absent";
+    config.lsl.sourceId = "neuronide-test-state-absent";
+
+    auto      eegQueue = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
+    LSLReader reader(config);
+    EXPECT_EQ(reader.state(), AcquisitionState::Idle);
+
+    reader.start(eegQueue);
+    EXPECT_EQ(reader.state(), AcquisitionState::Resolving);
+
+    reader.stop();
+    EXPECT_EQ(reader.state(), AcquisitionState::Idle);
+    EXPECT_EQ(reader.failure(), nullptr);
+}
+
+TEST(LSLReaderTest, ReportsStreamingOnceSamplesArrive) {
+    DeviceConfig config = makeConfig();
+    config.lsl.name     = "neuronide_test_state_streaming";
+    config.lsl.sourceId = "neuronide-test-state-streaming";
+
+    lsl::stream_outlet outlet   = makeOutlet(config);
+    auto               eegQueue = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
+    LSLReader          reader(config);
+    reader.start(eegQueue);
+
+    ASSERT_TRUE(waitForConsumer(outlet)) << "LSLReader did not subscribe (needs loopback)";
+    EXPECT_EQ(reader.state(), AcquisitionState::Resolving) << "no sample has been queued yet";
+
+    const std::stop_source neverStopped;
+    pushSamples(outlet, makeSample(), kSamplesToPush);
+    EXPECT_EQ(reader.waitWhileResolving(std::chrono::steady_clock::now() + kStateWait,
+                                        neverStopped.get_token()),
+              AcquisitionState::Streaming);
+
+    reader.stop();
+}
+
+TEST(LSLReaderTest, ReportsFailureAndNotifiesOnceForRejectedStream) {
+    DeviceConfig config = makeConfig();
+    config.lsl.name     = "neuronide_test_state_failed";
+    config.lsl.sourceId = "neuronide-test-state-failed";
+
+    lsl::stream_outlet outlet   = makeOutletWithShape(config, kMismatchedChannels, kSampleRate);
+    auto               eegQueue = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
+    LSLReader          reader(config);
+
+    std::atomic<int> notifications{0};
+    EXPECT_EQ(startWaitAndStop(reader, eegQueue, [&notifications] { ++notifications; }),
+              AcquisitionState::Failed);
+
+    EXPECT_EQ(notifications.load(), 1);
+    EXPECT_EQ(reader.state(), AcquisitionState::Failed) << "a failure must survive stop()";
+    EXPECT_NE(reader.failure(), nullptr);
+}
+
+TEST(LSLReaderTest, WaitWhileResolvingReturnsWhenStopTokenFires) {
+    DeviceConfig config = makeConfig();
+    config.lsl.name     = "neuronide_test_state_wait_stop";
+    config.lsl.sourceId = "neuronide-test-state-wait-stop";
+
+    auto      eegQueue = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
+    LSLReader reader(config);
+    reader.start(eegQueue);
+
+    std::stop_source stopSource;
+    stopSource.request_stop();
+    EXPECT_EQ(reader.waitWhileResolving(std::chrono::steady_clock::now() + kStateWait,
+                                        stopSource.get_token()),
+              AcquisitionState::Resolving);
+
+    reader.stop();
 }

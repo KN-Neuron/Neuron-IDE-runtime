@@ -191,6 +191,55 @@ TEST(ConfigParserTest, MissingOutputFormatFieldThrows) {
     EXPECT_THROW(parseString(jsonText), std::invalid_argument);
 }
 
+// A minimal valid config with the given raw `display` section.
+std::string withDisplay(const std::string& display) {
+    return R"json({
+      "config_version": "1.1", "device_name": "Dev", "montage_standard": "10-20",
+      "lsl_stream": {
+        "name": "s", "type": "EEG", "source_id": "x",
+        "expected_channel_count": 1, "expected_sample_rate_hz": 250
+      },
+      "channels": [ { "index": 0, "label": "Fz", "enabled": true, "unit": "uV" } ],
+      "display": )json" +
+           display + "\n}";
+}
+
+TEST(ConfigParserTest, ParsesDisplaySection) {
+    constexpr int kIndex  = 1;
+    constexpr int kWidth  = 1920;
+    constexpr int kHeight = 1080;
+
+    const DeviceConfig config = parseString(withDisplay(
+        R"json({ "index": 1, "fullscreen": false, "width": 1920, "height": 1080 })json"));
+    EXPECT_EQ(config.display.index, kIndex);
+    EXPECT_FALSE(config.display.fullscreen);
+    EXPECT_EQ(config.display.width, kWidth);
+    EXPECT_EQ(config.display.height, kHeight);
+}
+
+TEST(ConfigParserTest, DisplayDefaultsToFullscreenOnFirstMonitorWhenSectionAbsent) {
+    const DeviceConfig config = parseString(kMinimalConfig);
+    EXPECT_EQ(config.display.index, 0);
+    EXPECT_TRUE(config.display.fullscreen);
+}
+
+TEST(ConfigParserTest, DisplayKeysAreIndividuallyOptional) {
+    const DeviceConfig config = parseString(withDisplay(R"json({ "index": 2 })json"));
+    EXPECT_EQ(config.display.index, 2);
+    EXPECT_TRUE(config.display.fullscreen);
+    EXPECT_EQ(config.display.width, DisplayConfig::kDefaultWindowWidth);
+    EXPECT_EQ(config.display.height, DisplayConfig::kDefaultWindowHeight);
+}
+
+TEST(ConfigParserTest, DisplayFieldWithWrongTypeThrows) {
+    EXPECT_THROW(parseString(withDisplay(R"json({ "fullscreen": "yes" })json")),
+                 std::invalid_argument);
+}
+
+TEST(ConfigParserTest, DisplayThatIsNotAnObjectThrows) {
+    EXPECT_THROW(parseString(withDisplay("1")), std::invalid_argument);
+}
+
 TEST(ConfigParserTest, MissingLslStreamThrows) {
     const std::string jsonText = R"json({
       "config_version": "1.0",

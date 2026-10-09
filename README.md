@@ -192,6 +192,7 @@ otherwise the same experiment stops being portable between labs.
 | Stimulus timing, trial structure, marker/event names        | Expected stream shape: channel count, sample rate                    |
 | Anything the editor authors and versions with the study     | Channel table: index, label, enabled, unit                           |
 |                                                             | Reference / ground electrodes, impedance check thresholds            |
+|                                                             | Participant display: monitor, fullscreen, window size (`display`)    |
 |                                                             | Output format for `DataWriter` (`output.format`)                     |
 
 Consequences of the split:
@@ -210,7 +211,7 @@ way — `channels` is a top-level key, so it is a top-level `DeviceConfig` field
 
 ```jsonc
 {
-  "config_version": "1.0",              // "MAJOR.MINOR", checked first (see below)
+  "config_version": "1.1",              // "MAJOR.MINOR", checked first (see below)
   "device_name": "OpenBCI Cyton 8ch",
   "montage_standard": "10-20",
   "lsl_stream": {                       // -> DeviceConfig::lsl (LSLConfig)
@@ -228,13 +229,20 @@ way — `channels` is a top-level key, so it is a top-level `DeviceConfig` field
     // ... one entry per expected_channel_count, indices unique and in range
   ],
   "impedance_check": { "supported": true, "threshold_kohm": 5.0 },
+  "display": {                          // -> DeviceConfig::display; every key optional
+    "index": 1,                         // monitor facing the participant (default 0)
+    "fullscreen": true,                 // native-resolution fullscreen (default true)
+    "width": 1280, "height": 720        // window size, used only when not fullscreen
+  },
   "output": { "format": "csv" }         // -> DataFormatStrategyFactory, defaults to csv
 }
 ```
 
 `config_version`, `device_name`, `montage_standard`, `lsl_stream` and `channels`
-are required; `reference`, `ground`, `impedance_check` and `output` default when
-absent. If `output` is present it must carry a non-empty `format`; whether that
+are required; `reference`, `ground`, `impedance_check`, `display` and `output`
+default when absent. Unlike the other optional sections, each key inside `display`
+is optional on its own (`"display": { "index": 1 }` is complete). If `output` is
+present it must carry a non-empty `format`; whether that
 format is *known* is decided by `DataFormatStrategyFactory` when the writer is
 built, not by config validation.
 Channels with `"enabled": false` stay in the config (they document the cap) but
@@ -310,6 +318,39 @@ the re-resolved stream is re-validated (channel count, sample rate) before
 acquisition continues. Config errors (mismatched stream shape, no enabled channels)
 stay fatal — they are logged and the worker exits instead of retrying forever.
 
+`LSLReader` reports where it is as a typed `AcquisitionState`: `Idle` → `Resolving`
+→ `Streaming` (set on the first *queued sample*, not on resolve), back to
+`Resolving` after a lost stream, or `Failed` for good. `waitWhileResolving(deadline,
+stop_token)` blocks until the state changes; `failure()` holds the reason, and an
+optional callback passed to `start()` fires once on the reader thread on failure.
+A `Failed` state survives `stop()` so the reason can be read after joining.
+
+### `Runtime::run()` sequence
+
+`Runtime` builds everything that can reject the configuration (both config files,
+output directory, format strategy, `LSLReader`) **before** it creates the window, so a
+bad config never flashes a window at the participant. `run()` then:
+
+1. **Acquisition gate.** Starts `LSLReader` and waits for the first EEG sample,
+   handling window events meanwhile. **No stimulus is shown without EEG**: a stream
+   that fails validation, or delivers nothing within the acquisition timeout
+   (default 30 s), throws; closing the window or `requestStop()` returns without
+   recording.
+2. **Recording.** Creates `<experiment>_<YYYYMMDDTHHMMSS>[_N].<ext>` in the output
+   directory and runs the render loop. Format strategies must create the file
+   exclusively — an existing recording is never overwritten.
+3. **Shutdown.** Stops `LSLReader`, then `DataWriter` (producer before consumer, so
+   the writer drains everything). If acquisition failed for good mid-experiment,
+   the failure callback has already stopped the render loop, and `run()` throws
+   once the recording is closed.
+
+`run()` is single-shot and must be called on the thread that constructed the
+`Runtime` (SDL handles window events only there); both are enforced with
+`std::logic_error`. The default render target opens the window on
+`display.index` and **refuses to run without vsync** — SDL silently drops
+`PRESENTVSYNC` when the driver can't honour it, and marker timestamps are only
+correct when `SDL_RenderPresent` waits for the refresh.
+
 ## 7. Implementation status
 
 | Area / class                | Status        | Notes                                                        |
@@ -320,12 +361,12 @@ stay fatal — they are logged and the worker exits instead of retrying forever.
 | `ComponentRegistry`         | Implemented   | proto-type → factory, macro-based self-registration          |
 | `specifiic components` | **Planned** | defined in `neuronide.proto`, not yet implemented in C++     |
 | `Renderer`                  | Implemented   | SDL + vsync, marker timestamping                             |
-| `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `DeviceConfig`, enabled channels only, re-resolves lost streams |
+| `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `DeviceConfig`, enabled channels only, re-resolves lost streams, reports `AcquisitionState` |
 | `ConfigParser`              | Implemented   | `config.json` → `DeviceConfig` (1:1 mapping, major-version checked, see §5), nlohmann/json |
 | Config `validate()`         | Implemented   | semantic rules on the config types themselves, independent of JSON (see §5) |
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
 | `DataFormatStrategyFactory` | Implemented   | `output.format` → format strategy; unknown formats rejected  |
-| `Runtime` orchestration     | Implemented   | owns SDL session, parses both config files, wires the queues, drives the render loop, stops workers |
+| `Runtime` orchestration     | Implemented   | owns SDL session, parses both config files, gates the experiment on live EEG, records to a fresh file, drives the render loop, stops workers (see §6) |
 
 The class diagram in older docs is partly aspirational; the table above reflects
 the actual code.
@@ -375,7 +416,7 @@ sudo apt install cmake clang-format clang-tidy libsdl2-dev protobuf-compiler gco
 ```bash
 cmake -B build
 cmake --build build
-./build/src/NeuronIDE config.json experiment.neuroz  # parses the device config, parses scene, starts LSLReader, DataWriter, Renderer.
+./build/src/NeuronIDE config.json experiment.neuroz  # waits for the EEG stream, then records and runs the experiment
 ```
 
 `NeuronIDE` takes the path to a device `config.json` (defaults to `config.json` in
@@ -390,8 +431,8 @@ ctest -L unit --output-on-failure  # unit tests only
 ctest -L component --output-on-failure
 ```
 
-> Note: `LSLReader` unit tests open a local LSL stream and exercise a real
-> outlet→inlet round-trip over loopback; they need loopback multicast to be
+> Note: `LSLReader` and `Runtime` unit tests open local LSL streams and exercise a
+> real outlet→inlet round-trip over loopback; they need loopback multicast to be
 > available.
 
 ### Formatting & static analysis

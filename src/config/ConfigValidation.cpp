@@ -8,6 +8,7 @@
 #include <config/ChannelConfig.hpp>
 #include <config/ConfigVersion.hpp>
 #include <config/DeviceConfig.hpp>
+#include <config/DisplayConfig.hpp>
 #include <config/LSLConfig.hpp>
 #include <config/OutputConfig.hpp>
 #include <stdexcept>
@@ -60,6 +61,17 @@ void ImpedanceConfig::validate() const {
     }
 }
 
+void DisplayConfig::validate() const {
+    if (index < 0) {
+        throw std::invalid_argument("DisplayConfig: 'index' must not be negative, got " +
+                                    std::to_string(index));
+    }
+    if (width <= 0 || height <= 0) {
+        throw std::invalid_argument("DisplayConfig: 'width' and 'height' must be positive, got " +
+                                    std::to_string(width) + "x" + std::to_string(height));
+    }
+}
+
 void OutputConfig::validate() const { requireNonEmpty(format, "format", "OutputConfig"); }
 
 void DeviceConfig::validate() const {
@@ -67,6 +79,7 @@ void DeviceConfig::validate() const {
     requireNonEmpty(deviceName, "device_name", "DeviceConfig");
     lsl.validate();
     impedance.validate();
+    display.validate();
     output.validate();
 
     if (static_cast<int>(channels.size()) != lsl.expectedChannelCount) {
