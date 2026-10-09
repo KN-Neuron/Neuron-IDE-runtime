@@ -17,9 +17,9 @@ You are in the **runtime** repo. Read the system overview below first.
 - Read README §3 (architecture: Renderer / LSLReader / DataWriter threads) and §5 (what goes in
   the `.neuroz` proto vs the device `config.json`) before adding settings.
 - Inputs: the `.neuroz` comes from the backend export (`POST /api/v0/projects/export/{id}`); the
-  device `config.json` is written by the launcher, which starts the runtime once it accepts
-  command-line arguments (runtime#37). Exit codes are part of that contract: the launcher shows
-  them to the experimenter.
+  device `config.json` is written by the launcher, which starts the runtime with `[config.json] <experiment.neuroz>`
+  (#31). It also needs an output-folder argument and distinct exit codes (runtime#37). Exit
+  codes are part of that contract: the launcher shows them to the experimenter.
 - `config.json` is also produced by the launcher (Python). Changing its keys or validation rules
   is a cross-team change: bump `config_version` and tell the launcher team.
 
@@ -74,7 +74,7 @@ Steps: experiment → subject → session → device → electrodes → signal c
 again"). Data lives in `<data root>/<experiment>/subjects/S001/sessions/001/runs/01/`.
 Subjects' form answers are **personal data** and live only in the experiment's `subjects.csv`,
 never in folder names, recordings or logs. For each run it writes `config.json` and starts the
-runtime (CLI: runtime#37), which records EEG + markers into the run folder. Tasks: epic
+runtime (CLI: runtime#31 + runtime#37), which records EEG + markers into the run folder. Tasks: epic
 launcher#1.
 
 ### Backend HTTP API (base `/api/v0`, Swagger at `http://localhost:8000/docs`)
@@ -101,8 +101,9 @@ launcher#1.
 - Media files (images, audio, scripts) can't be uploaded, so the runtime can't find them (backend#25).
 - Auth is a placeholder (frontend#57, backend#14).
 - Subject form has no format yet (frontend#64).
-- Runtime ignores command-line arguments, so the launcher can't start it yet (runtime#37);
-  `Runtime::start()` is a stub until the main loop lands (runtime#15).
+- Runtime main loop and CLI `NeuronIDE [config.json] <experiment.neuroz>` are still in review
+  (runtime#31). The launcher also needs an output-folder argument and distinct exit codes
+  (runtime#37).
 
 ### Working across repos
 
