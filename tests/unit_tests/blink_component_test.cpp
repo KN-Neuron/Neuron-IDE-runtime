@@ -11,6 +11,11 @@ constexpr double kFrequencyHz        = 1.0;
 constexpr double kQuarterPeriod      = 0.25;
 constexpr double kThreeQuarterPeriod = 0.75;
 constexpr double kStep               = 0.05;
+constexpr double kDoubledFrequencyHz = 2.0;
+constexpr double kEighthPeriodStep   = 0.125;
+constexpr double kQuarterSecondStep  = 0.25;
+constexpr double kMultiPeriodStep    = 2.25;
+constexpr double kHalfSecondStep     = 0.5;
 }  // namespace
 
 // TEST 1
@@ -57,5 +62,33 @@ TEST(BlinkComponentTest, TogglesVisibilityBasedOnAccumulatedTime) {
         blink.update(ctx);
         elapsed += kStep;
     }
+    EXPECT_FALSE(owner->isVisible);
+}
+
+// setFrequency() replaces the blink frequency: after switching from 1 Hz to 2 Hz the sine wave has
+// to follow the new frequency. At 2 Hz the peak is at 0.125 s and the trough at 0.375 s.
+TEST(BlinkComponentTest, SetFrequencyChangesBlinkRate) {
+    auto           owner = std::make_shared<SceneObject>("Blinker", true);
+    BlinkComponent blink(owner, kFrequencyHz);
+
+    blink.setFrequency(kDoubledFrequencyHz);
+
+    blink.update(Context{kEighthPeriodStep, nullptr});
+    EXPECT_TRUE(owner->isVisible);
+
+    blink.update(Context{kQuarterSecondStep, nullptr});
+    EXPECT_FALSE(owner->isVisible);
+}
+
+// A single frame can be longer than the whole blink period. The visibility must still follow the
+// phase of the accumulated time: 2.25 s at 1 Hz is a peak (2 full periods + 0.25), 2.75 s a trough.
+TEST(BlinkComponentTest, HandlesTimeStepLongerThanOnePeriod) {
+    auto           owner = std::make_shared<SceneObject>("Blinker", true);
+    BlinkComponent blink(owner, kFrequencyHz);
+
+    blink.update(Context{kMultiPeriodStep, nullptr});
+    EXPECT_TRUE(owner->isVisible);
+
+    blink.update(Context{kHalfSecondStep, nullptr});
     EXPECT_FALSE(owner->isVisible);
 }
