@@ -1,6 +1,7 @@
 #include "scene/components/BlinkComponent.hpp"
 
 #include <cmath>
+#include <numbers>
 
 #include "data_structures/Context.hpp"
 #include "neuronide.pb.h"
@@ -8,12 +9,17 @@
 #include "scene/components/ComponentRegistry.hpp"
 
 namespace {
-constexpr double kTwoPi = 2.0 * M_PI;
+constexpr double kTwoPi = 2.0 * std::numbers::pi;
 }  // namespace
 
 void BlinkComponent::setFrequency(double freq) {
     blinkFrequencyHz = freq;
-	elapsedTime = 0.0;
+    elapsedTime      = 0.0;
+    if (blinkFrequencyHz <= 0.0) {
+        if (auto ownerPtr = owner.lock()) {
+            ownerPtr->isVisible = true;
+        }
+    }
 }
 
 std::unique_ptr<Component> BlinkComponent::createBlinker(
@@ -22,12 +28,11 @@ std::unique_ptr<Component> BlinkComponent::createBlinker(
 }
 
 void BlinkComponent::update(const Context& context) {
-    auto ownerPtr = owner.lock();
-    if (ownerPtr == nullptr) {
+    if (blinkFrequencyHz <= 0.0) {
         return;
     }
-    if (blinkFrequencyHz <= 0.0) {
-        ownerPtr->isVisible = true;
+    auto ownerPtr = owner.lock();
+    if (ownerPtr == nullptr) {
         return;
     }
     elapsedTime += context.timestamp;

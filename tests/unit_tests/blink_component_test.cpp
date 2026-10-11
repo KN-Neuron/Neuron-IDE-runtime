@@ -20,15 +20,32 @@ constexpr double kThreeQuarterStep   = 0.75;
 }  // namespace
 
 // TEST 1
-// A frequency of 0 Hz disables blinking: after update() the owner must stay visible
-TEST(BlinkComponentTest, StaysVisibleWhenFrequencyIsZero) {
-    auto           owner = std::make_shared<SceneObject>("Blinker", true);
+// At 0 Hz the component does not blink and must not touch the owner's visibility, so a value set
+// from outside (e.g. by a script) is preserved across update() calls.
+TEST(BlinkComponentTest, DoesNotOverrideVisibilityWhenFrequencyIsZero) {
+    auto           owner = std::make_shared<SceneObject>("Blinker", false);
     BlinkComponent blink(owner, 0.0);
 
-    Context ctx{kStep, nullptr};
-    blink.update(ctx);
+    blink.update(Context{kStep, nullptr});
 
+    EXPECT_FALSE(owner->isVisible);
+}
+
+// Switching blinking off while the owner is hidden must leave it visible, but only once: after
+// that the component no longer forces visibility.
+TEST(BlinkComponentTest, RestoresVisibilityOnceWhenFrequencySetToZero) {
+    auto           owner = std::make_shared<SceneObject>("Blinker", true);
+    BlinkComponent blink(owner, kFrequencyHz);
+
+    blink.update(Context{kThreeQuarterStep, nullptr});
+    ASSERT_FALSE(owner->isVisible);
+
+    blink.setFrequency(0.0);
     EXPECT_TRUE(owner->isVisible);
+
+    owner->isVisible = false;
+    blink.update(Context{kStep, nullptr});
+    EXPECT_FALSE(owner->isVisible);
 }
 
 // TEST 2
