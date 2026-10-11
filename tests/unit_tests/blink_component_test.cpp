@@ -19,9 +19,8 @@ constexpr double kHalfSecondStep     = 0.5;
 constexpr double kThreeQuarterStep   = 0.75;
 }  // namespace
 
-// TEST 1
 // At 0 Hz the component does not blink and must not touch the owner's visibility, so a value set
-// from outside (e.g. by a script) is preserved across update() calls.
+// from outside is preserved across update() calls.
 TEST(BlinkComponentTest, DoesNotOverrideVisibilityWhenFrequencyIsZero) {
     auto           owner = std::make_shared<SceneObject>("Blinker", false);
     BlinkComponent blink(owner, 0.0);
@@ -48,9 +47,9 @@ TEST(BlinkComponentTest, RestoresVisibilityOnceWhenFrequencySetToZero) {
     EXPECT_FALSE(owner->isVisible);
 }
 
-// TEST 2
 // If the owner is destroyed while the component
-// is still alive, update() must detect the expired pointer and do nothing instead of crashing.
+// is still alive, update() must detect the expired pointer
+// and do nothing instead of crashing.
 TEST(BlinkComponentTest, DoesNotCrashWhenOwnerExpired) {
     std::unique_ptr<BlinkComponent> blink;
     {
@@ -62,7 +61,10 @@ TEST(BlinkComponentTest, DoesNotCrashWhenOwnerExpired) {
     EXPECT_NO_THROW(blink->update(ctx));
 }
 
-// TEST 3
+// Context::timestamp is the per-frame delta, so the component has to accumulate it. At 1 Hz,
+//  after 0.25 s (sine peak) the owner is visible,
+//  after 0.75 s (sine trough) it is hidden.
+//  Fails if update() uses the raw delta
 TEST(BlinkComponentTest, TogglesVisibilityBasedOnAccumulatedTime) {
     auto           owner = std::make_shared<SceneObject>("Blinker", true);
     BlinkComponent blink(owner, kFrequencyHz);
