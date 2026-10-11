@@ -11,7 +11,10 @@ namespace {
 constexpr double kTwoPi = 2.0 * M_PI;
 }  // namespace
 
-void BlinkComponent::setFrequency(double freq) { blinkFrequencyHz = freq; }
+void BlinkComponent::setFrequency(double freq) {
+    blinkFrequencyHz = freq;
+	elapsedTime = 0.0;
+}
 
 std::unique_ptr<Component> BlinkComponent::createBlinker(
     const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner) {

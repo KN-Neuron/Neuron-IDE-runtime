@@ -16,6 +16,7 @@ constexpr double kEighthPeriodStep   = 0.125;
 constexpr double kQuarterSecondStep  = 0.25;
 constexpr double kMultiPeriodStep    = 2.25;
 constexpr double kHalfSecondStep     = 0.5;
+constexpr double kThreeQuarterStep   = 0.75;
 }  // namespace
 
 // TEST 1
@@ -91,4 +92,19 @@ TEST(BlinkComponentTest, HandlesTimeStepLongerThanOnePeriod) {
 
     blink.update(Context{kHalfSecondStep, nullptr});
     EXPECT_FALSE(owner->isVisible);
+}
+
+// setFrequency() restarts the blink cycle. After running to the trough of the previous cycle
+// (0.75 s at 1 Hz, hidden), changing the frequency must start from phase 0 again, so a small step
+// afterwards shows the owner as visible instead of continuing from the old phase.
+TEST(BlinkComponentTest, SetFrequencyRestartsBlinkCycle) {
+    auto           owner = std::make_shared<SceneObject>("Blinker", true);
+    BlinkComponent blink(owner, kFrequencyHz);
+
+    blink.update(Context{kThreeQuarterStep, nullptr});
+    ASSERT_FALSE(owner->isVisible);
+
+    blink.setFrequency(kFrequencyHz);
+    blink.update(Context{kEighthPeriodStep, nullptr});
+    EXPECT_TRUE(owner->isVisible);
 }
