@@ -2,3 +2,4 @@ include(GoogleTest)
 
 add_subdirectory(unit_tests)
 add_subdirectory(component_tests)
+add_subdirectory(registration_tests)

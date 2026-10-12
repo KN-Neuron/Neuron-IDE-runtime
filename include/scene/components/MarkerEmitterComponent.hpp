@@ -10,6 +10,7 @@
 #include "scene/components/Component.hpp"
 
 class Scene;
+struct ComponentBuildContext;
 
 namespace NeuronIDE {
 class Component;
@@ -36,8 +37,9 @@ class MarkerEmitterComponent : public Component {
     void render(SDL_Renderer* renderer) override;
     void onSceneReady(Scene& scene) override;
 
-    static std::unique_ptr<Component> createMarkerEmitter(
-        const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner);
+    static std::unique_ptr<Component> createMarkerEmitter(const NeuronIDE::Component& protoComp,
+                                                          const std::shared_ptr<SceneObject>& owner,
+                                                          const ComponentBuildContext& context);
 
    private:
     struct ActiveSubscription {

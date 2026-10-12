@@ -68,6 +68,22 @@ class MarkerComponent : public Component {
     std::shared_ptr<std::stop_source> stopSource;
 };
 
+class RenderTargetSpy : public Component {
+   public:
+    RenderTargetSpy(const std::shared_ptr<SceneObject>& owner,
+                    std::weak_ptr<SDL_Renderer>*        received)
+        : Component(owner), received(received) {}
+
+    void onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target) override {
+        *received = target;
+    }
+    void update(const Context& context) override { (void)context; }
+    void render(SDL_Renderer* renderer) override { (void)renderer; }
+
+   private:
+    std::weak_ptr<SDL_Renderer>* received;
+};
+
 class RendererTest : public ::testing::Test {
    protected:
     void SetUp() override { ASSERT_EQ(SDL_Init(SDL_INIT_EVENTS), 0); }
@@ -108,6 +124,20 @@ TEST_F(RendererTest, RenderLoop_WhenComponentAdded_CallsUpdateExactlyOnceBeforeS
 
     EXPECT_EQ(*updates, 1);
     EXPECT_EQ(*renders, 1);
+}
+
+TEST_F(RendererTest, Constructor_HandsRenderTargetToComponentsBeforeFirstFrame) {
+    auto                        scene = std::make_shared<Scene>();
+    auto                        obj   = std::make_shared<SceneObject>("obj");
+    std::weak_ptr<SDL_Renderer> received;
+
+    obj->addComponent(std::make_unique<RenderTargetSpy>(obj, &received));
+    scene->addObject(obj);
+
+    const auto     target = makeSoftwareRenderer();
+    const Renderer renderer(scene, target, std::make_shared<moodycamel::ConcurrentQueue<Marker>>());
+
+    EXPECT_EQ(received.lock(), target);
 }
 
 TEST_F(RendererTest, RenderLoop_QueuesMarkersFromComponents) {
