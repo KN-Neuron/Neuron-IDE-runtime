@@ -52,8 +52,9 @@ FetchContent_MakeAvailable(googletest liblsl concurrentqueue nlohmann_json)
 set(CMAKE_C_FLAGS "${BACKUP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${BACKUP_CXX_FLAGS}")
 
-# 5. SDL2 (System installed)
+# 5. SDL2 + SDL2_image (System installed)
 find_package(SDL2 REQUIRED)
+find_package(SDL2_image REQUIRED)
 
 # 6. Protobuf (System installed)
 find_package(Protobuf REQUIRED)

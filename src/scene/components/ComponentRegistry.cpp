@@ -14,14 +14,15 @@ void ComponentRegistry::registerCreator(int typeId, ComponentCreatorFunc creator
 }
 
 std::unique_ptr<Component> ComponentRegistry::build(const NeuronIDE::Component&         protoComp,
-                                                    const std::shared_ptr<SceneObject>& owner) {
+                                                    const std::shared_ptr<SceneObject>& owner,
+                                                    const ComponentBuildContext&        context) {
     auto activeCase = protoComp.component_type_case();
 
     int typeId = static_cast<int>(activeCase);
 
     auto iter = creators.find(typeId);
     if (iter != creators.end()) {
-        return iter->second(protoComp, owner);
+        return iter->second(protoComp, owner, context);
     }
 
     return nullptr;
