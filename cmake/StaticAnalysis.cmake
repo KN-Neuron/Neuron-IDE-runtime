@@ -1,12 +1,18 @@
 # cmake/StaticAnalysis.cmake
 
 # --- Clang-Tidy Configuration ---
-find_program(CLANG_TIDY_EXE NAMES "clang-tidy-20")
-if(CLANG_TIDY_EXE)
-    message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
-    set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
-else()
-    message(WARNING "clang-tidy not found.")
+# Runs clang-tidy next to the compiler on every file, which costs several times more than the
+# compile itself. CI turns it off and runs clang-tidy in a separate job instead.
+option(NEURON_IDE_ENABLE_CLANG_TIDY "Run clang-tidy on every file as part of the build" ON)
+
+if(NEURON_IDE_ENABLE_CLANG_TIDY)
+    find_program(CLANG_TIDY_EXE NAMES "clang-tidy-20")
+    if(CLANG_TIDY_EXE)
+        message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
+        set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+    else()
+        message(WARNING "clang-tidy not found.")
+    endif()
 endif()
 
 # --- Clang-Format Target ---

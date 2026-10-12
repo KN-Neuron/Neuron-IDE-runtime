@@ -444,6 +444,8 @@ ctest -L component --output-on-failure
   ```bash
   cmake --build build --target format
   ```
+- clang-tidy runs on every file as part of the build, which makes builds several times slower.
+  Configure with `-DNEURON_IDE_ENABLE_CLANG_TIDY=OFF` to skip it; CI checks it in a separate job.
 
 ### Coverage
 
