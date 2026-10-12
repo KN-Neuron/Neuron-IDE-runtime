@@ -39,7 +39,7 @@ EEG samples and the stimulus markers must share a **common clock domain** so tha
 | Experiment file format   | Protocol Buffers (proto3) — see `protoFiles/neuronide.proto`           |
 | Device config format     | JSON (`config.json`) parsed with [nlohmann/json](https://github.com/nlohmann/json) |
 | EEG acquisition          | [LSL — Lab Streaming Layer](https://github.com/sccn/liblsl) (`liblsl`) |
-| Rendering / windowing    | SDL2 (+ SDL2_image), with vsync                                        |
+| Rendering / windowing    | SDL2 + SDL2_image, with vsync (SDL2_ttf planned, see [Components](#components)) |
 | Inter-thread queues      | [moodycamel ConcurrentQueue](https://github.com/cameron314/concurrentqueue) (lock-free) |
 | Python scripting (planned)| pybind11 (`ScriptComponent`)                                          |
 | Testing                  | GoogleTest + CTest                                                     |
@@ -138,7 +138,28 @@ classDiagram
 Components are built from protobuf messages by a **`ComponentRegistry`** (a
 singleton mapping a proto component type id → factory function). New component
 types self-register via the `REGISTER_COMPONENT(typeId, creatorFunc)` macro, so
-the parser does not need to know about concrete component classes.
+the parser does not need to know about concrete component classes. Each creator
+also receives a `ComponentBuildContext`, which resolves asset paths: a relative
+path in the `.neuroz` is taken relative to the folder holding the `.neuroz`, and an
+absolute one is used as-is.
+
+Self-registration runs from static initializers that nothing else references, so a
+plain static link silently drops them. Executables therefore link the `runtime_core`
+target, which pulls in the whole archive. `tests/registration_tests` guards this, and
+every new component type gets a line there.
+
+After construction, a component goes through two hooks, both before the first frame:
+
+1. `onSceneReady(Scene&)`, called by `Parser` once every object exists, to resolve
+   and subscribe to events.
+2. `onRenderTargetReady(const std::shared_ptr<SDL_Renderer>&)`, called by the
+   `Renderer` constructor once the window exists, to create GPU resources such as
+   textures. Doing it there, not lazily on the first `render()`, keeps uploads from
+   delaying the first stimulus frame and its marker. SDL frees a renderer's textures
+   along with it, so a component holding textures keeps the target alive.
+
+Anything that can fail on bad input (a missing image, for instance) fails during
+parsing, before the window opens.
 
 ### Core data structures
 
@@ -359,7 +380,7 @@ correct when `SDL_RenderPresent` waits for the refresh.
 | `Scene` / `SceneObject`     | Implemented   | component containers                                          |
 | `Component` (base)          | Implemented   | abstract `update` / `render`                                 |
 | `ComponentRegistry`         | Implemented   | proto-type → factory, macro-based self-registration          |
-| `specifiic components` | **Planned** | defined in `neuronide.proto`, not yet implemented in C++     |
+| Scene components            | **Partial**   | 3 of the 9 MVP components have a C++ class, see [Components](#components) |
 | `Renderer`                  | Implemented   | SDL + vsync, marker timestamping                             |
 | `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `DeviceConfig`, enabled channels only, re-resolves lost streams, reports `AcquisitionState` |
 | `ConfigParser`              | Implemented   | `config.json` → `DeviceConfig` (1:1 mapping, major-version checked, see §5), nlohmann/json |
@@ -370,6 +391,72 @@ correct when `SDL_RenderPresent` waits for the refresh.
 
 The class diagram in older docs is partly aspirational; the table above reflects
 the actual code.
+
+### Components
+
+The MVP set of components an experiment is built from, and where each one stands.
+Status as of **2026-10-10**, checked against `main`, open PRs and `neuronide.proto`.
+Update the row in the same PR that changes it.
+
+| Component | What it does | Proto (`neuronide.proto`) | C++ (`scene/components/`) | Status | Tracking |
+| --- | --- | --- | --- | --- | --- |
+| Transform | Position, size, rotation. Exactly one per object. x/y is the top-left corner in window pixels, rotation is degrees clockwise about the centre. | `SceneObject.transform`, a field rather than a `Component` | `SceneObject::Transform` | **Partial**: parsed onto the object and drawn by SpriteRenderer, but not required (an object without one sits at all zeros; a sprite on it is rejected at parse time) | — |
+| SpriteRenderer | Draws an image: visual stimuli, photos, icons. | `SpriteRenderer` (`renderer = 1`), `img_path`; field 1 (`texture_path`) is reserved | `SpriteRenderer`, registered | **Implemented**: any SDL2_image format (PNG, JPEG, …), stretched over the Transform and rotated. Decoded at parse time, so a missing or unreadable file stops the run before the window opens; uploaded to the GPU before the first frame | [#17][rt-17], [backend#25][be-25] |
+| TextRenderer | Draws text in a chosen font and size: instructions, letters, numbers. | `TextRenderer` (`text = 2`) | — | **Planned**: needs SDL2_ttf, which is not a dependency yet. The message has no text color | [#18][rt-18], [backend#25][be-25] |
+| BlinkComponent | Flickers the object at a set frequency in Hz. The basis for SSVEP. | `BlinkComponent` (`blinker = 3`) | `BlinkComponent`, registered and built by the parser | **In review**: `update()` is an empty TODO on `main`, so nothing blinks yet. PR [#34][rt-34] implements it; changes requested | [#16][rt-16] |
+| MarkerEmitter | Emits an LSL marker on a scene event, ideally when an object appears or disappears. | `MarkerEmitterComponent` (`marker_emitter = 5`). Missing from the backend's copy | `MarkerEmitterComponent`, registered | **Implemented, nothing to bind to**: bindings resolve and push markers (tested against a test-only event source), but no production component exposes an event and objects have no appear/disappear events, so any binding in a real `.neuroz` fails at parse time | [backend#23][be-23] |
+| Lifetime | Keeps the object visible for N ms, then hides it. | — | — | **Not started** | — |
+| ResponseListener | While its object is active, records which key was pressed and the reaction time. | — | — | **Not started** | — |
+| ScriptComponent | Custom logic in Python, outside the standard components. | `ScriptComponent` (`script = 4`) | — | **Planned**: needs pybind11, which is not a dependency yet | [backend#25][be-25] |
+| AudioSource | Plays a sound. Possibly post-MVP. | — | — | **Not started** | — |
+
+- **Implemented**: registered class, behaviour complete, covered by tests.
+- **In review**: the implementation is in an open PR.
+- **Partial**: exists, with the gaps listed in its row.
+- **Planned**: the proto message exists, the C++ class does not. The parser **drops such
+  components silently** (`ComponentRegistry::build` returns `nullptr` and `Parser` skips
+  it), so a scene that uses one loads without error and the component does nothing.
+- **Not started**: neither a proto message nor a class. Adding the message comes first and
+  is a cross-team change (backend proto and dataclasses, launcher copy, frontend editor; see
+  `CLAUDE.md`).
+
+#### Open questions before the remaining components
+
+- **Event sources.** `MarkerEmitter` binds to events that a component exposes through
+  `getEvent()`, and nothing exposes one yet. The obvious first sources are an object
+  appearing or disappearing, a Lifetime timeout and a ResponseListener response.
+- **Who owns visibility.** Blink, Lifetime and scripts all write `SceneObject::isVisible`.
+  If appear/disappear events follow that flag, a 15 Hz blinker emits 30 markers a second,
+  and the 0 Hz branch in PR [#34][rt-34] overrides a script that hides the object. Keeping
+  "the object is shown in this trial" (Lifetime, scripts; drives the events) separate from
+  "flicker phase" (Blink; affects drawing only) avoids both.
+- **Frame-locked timing.** The screen only changes at vsync, and markers are stamped there.
+  Flicker phase and Lifetime durations should come from the frame being presented (frame
+  count × refresh period), not from summing `Context::timestamp`. That value is a loop
+  delta measured at the top of the loop, so it jitters, and a frame near an on/off edge
+  can land on either side. Frequencies above half the refresh rate can't be shown at all
+  and should be rejected. Dropped frames should be detected and logged.
+- **Input and reaction time.** The render loop polls SDL events itself and handles only
+  `SDL_QUIT`, and `Context` carries no input. ResponseListener needs key events passed
+  in, stamped with when the key was pressed, not with the vsync time the Renderer gives
+  markers. With one poll per frame, reaction-time resolution is one frame (~16.7 ms at
+  60 Hz). One option is to record the response as a marker (e.g. `response:<key>`) with its
+  own timestamp and compute reaction time offline against the onset marker.
+- **Media files.** Sprite, Text (fonts), Script and Audio all reference files by path. The
+  runtime resolves relative paths against the `.neuroz` folder (see
+  [Component model](#component-model)), but assets can't be uploaded or exported yet
+  ([backend#25][be-25]). Until they can, the launcher has to place them next to the
+  `.neuroz` by hand.
+- **Transform units.** `Transform` is in window pixels, so a stimulus's physical size depends
+  on the lab monitor, which comes from `config.json`. Decide whether to stay with pixels or
+  move to normalized or visual-angle units before more renderers land.
+
+[rt-16]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/16
+[rt-17]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/17
+[rt-18]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/18
+[rt-34]: https://github.com/KN-Neuron/Neuron-IDE-runtime/pull/34
+[be-23]: https://github.com/KN-Neuron/Neuron-IDE-backend/issues/23
+[be-25]: https://github.com/KN-Neuron/Neuron-IDE-backend/issues/25
 
 ## 8. Repository layout
 
@@ -393,7 +480,8 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
   ├── src/                  # one CMake subdirectory (static lib) per module
   └── tests/
       ├── unit_tests/       # CTest label: "unit"
-      └── component_tests/  # CTest label: "component"
+      ├── component_tests/  # CTest label: "component"
+      └── registration_tests/ # separate binary: every component is linked in (label "component")
 ```
 
 Each `src/<module>/` builds a static library; `runtime_core` links them together
@@ -407,7 +495,7 @@ All commands are run from the `Neuron-IDE-runtime/` directory.
 
 ```bash
 sudo apt update
-sudo apt install cmake clang-format clang-tidy libsdl2-dev protobuf-compiler gcovr
+sudo apt install cmake clang-format clang-tidy libsdl2-dev libsdl2-image-dev protobuf-compiler gcovr
 # GTest, LSL and concurrentqueue are fetched automatically by CMake.
 ```
 

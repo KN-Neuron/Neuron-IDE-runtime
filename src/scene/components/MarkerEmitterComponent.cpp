@@ -25,7 +25,8 @@ void MarkerEmitterComponent::onSceneReady(Scene& scene) {
 }
 
 std::unique_ptr<Component> MarkerEmitterComponent::createMarkerEmitter(
-    const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner) {
+    const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner,
+    const ComponentBuildContext& /*context*/) {
     std::vector<Binding> bindings;
     for (const auto& protoBinding : protoComp.marker_emitter().bindings()) {
         bindings.push_back({protoBinding.target_object(), protoBinding.target_event(),
