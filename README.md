@@ -41,11 +41,12 @@ EEG samples and the stimulus markers must share a **common clock domain** so tha
 | EEG acquisition          | [LSL — Lab Streaming Layer](https://github.com/sccn/liblsl) (`liblsl`) |
 | Rendering / windowing    | SDL2 + SDL2_image, with vsync (SDL2_ttf planned, see [Components](#components)) |
 | Inter-thread queues      | [moodycamel ConcurrentQueue](https://github.com/cameron314/concurrentqueue) (lock-free) |
+| Logging                  | [Quill](https://github.com/odygrd/quill) (asynchronous), to stderr — see §3 |
 | Python scripting (planned)| pybind11 (`ScriptComponent`)                                          |
 | Testing                  | GoogleTest + CTest                                                     |
 | Tooling                  | clang-format, clang-tidy, gcovr (coverage)                             |
 
-`liblsl`, `concurrentqueue`, `nlohmann/json`, and `googletest` are fetched
+`liblsl`, `concurrentqueue`, `nlohmann/json`, `quill`, and `googletest` are fetched
 automatically by CMake (`FetchContent`). SDL2 and Protobuf are expected to be
 installed on the system.
 
@@ -187,6 +188,29 @@ struct Context {                 // passed to Component::update each frame
     std::vector<std::string>* markers;     // sink: components append marker names here
 };
 ```
+
+### Logging
+
+Diagnostics go to **stderr** through [Quill](https://github.com/odygrd/quill). The
+calling thread only copies the message into a queue; a backend thread formats and
+writes it, so the render and acquisition threads never wait on I/O to log.
+
+```
+2026-10-13 16:43:15.852 WARNING  [lslreader] Stream 'obci_eeg1' lost (...); re-resolving
+```
+
+- Log through `logging::logger(logging::Subsystem::…)` from `<logging/Logging.hpp>`
+  with Quill's `LOG_DEBUG` … `LOG_CRITICAL` macros and `{}` placeholders. The
+  subsystem is printed in brackets, so messages need no `"LSLReader:"`-style prefix.
+  Do not write to `std::cout` / `std::cerr`; the usage text is the one exception.
+- `main()` holds a `logging::Session` for the whole run: it starts the backend and
+  writes out every queued message on exit. Tests get one from `tests/utils/TestMain.cpp`.
+- The level is `info` unless `NEURONIDE_LOG_LEVEL` sets another (`debug`, `warning`,
+  `none`, …); an unknown value is reported and ignored.
+- A crash (SIGSEGV, SIGABRT, …) still flushes the log. SIGINT and SIGTERM are left
+  to SDL, which turns them into `SDL_QUIT`, so a stopped run still closes its recording.
+- Nothing is logged per frame or per sample. Either log an error or throw it, not
+  both — except on a worker thread, where the log records *when* it failed.
 
 ## 4. Clock synchronization (critical)
 
@@ -395,6 +419,7 @@ correct when `SDL_RenderPresent` waits for the refresh.
 | Config `validate()`         | Implemented   | semantic rules on the config types themselves, independent of JSON (see §5) |
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
 | `DataFormatStrategyFactory` | Implemented   | `output.format` → format strategy; unknown formats rejected  |
+| Logging                     | Implemented   | Quill, one logger per subsystem, stderr (see §3) |
 | `Runtime` orchestration     | Implemented   | owns SDL session, parses both config files, gates the experiment on live EEG, records to a fresh file, drives the render loop, stops workers (see §6) |
 
 The class diagram in older docs is partly aspirational; the table above reflects
@@ -484,12 +509,15 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
   │   ├── renderer/         # Renderer
   │   ├── lslreader/        # LSLReader
   │   ├── datawriter/       # DataWriter, IDataFormatStrategy, CSVFormatStrategy
+  │   ├── logging/          # subsystem loggers + logging Session (Quill)
   │   └── Runtime.hpp
   ├── src/                  # one CMake subdirectory (static lib) per module
   └── tests/
       ├── unit_tests/       # CTest label: "unit"
       ├── component_tests/  # CTest label: "component"
-      └── registration_tests/ # separate binary: every component is linked in (label "component")
+      ├── registration_tests/ # separate binary: every component is linked in (label "component")
+      ├── cli_tests/        # CTest label: "cli" — runs the NeuronIDE binary
+      └── utils/            # shared helpers, test main()
 ```
 
 Each `src/<module>/` builds a static library; `runtime_core` links them together
@@ -504,7 +532,7 @@ All commands are run from the `Neuron-IDE-runtime/` directory.
 ```bash
 sudo apt update
 sudo apt install cmake ninja-build clang-format clang-tidy-20 libsdl2-dev libsdl2-image-dev protobuf-compiler gcovr
-# GTest, LSL, concurrentqueue and nlohmann/json are fetched automatically by CMake.
+# GTest, LSL, concurrentqueue, nlohmann/json and Quill are fetched automatically by CMake.
 ```
 
 ### Configure & build
@@ -554,6 +582,7 @@ cd build
 ctest --output-on-failure          # all tests
 ctest -L unit --output-on-failure  # unit tests only
 ctest -L component --output-on-failure
+ctest -L cli --output-on-failure   # the NeuronIDE binary end to end
 ```
 
 > Note: `LSLReader` and `Runtime` unit tests open local LSL streams and exercise a

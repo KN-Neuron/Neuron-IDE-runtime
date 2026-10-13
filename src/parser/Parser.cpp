@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <logging/Logging.hpp>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -11,6 +12,10 @@
 #include "scene/components/Component.hpp"
 #include "scene/components/ComponentBuildContext.hpp"
 #include "scene/components/ComponentRegistry.hpp"
+
+namespace {
+quill::Logger* logger() { return logging::logger(logging::Subsystem::Scene); }
+}  // namespace
 
 std::shared_ptr<Scene> Parser::parse(const std::string& filePath) {
     std::ifstream file(filePath, std::ios::binary);
@@ -44,11 +49,15 @@ std::shared_ptr<Scene> Parser::parseStream(std::istream&                stream,
 
     for (const auto& protoObj : protoScene.scene_objects()) {
         auto obj = buildSceneObject(protoObj, context);
+        LOG_DEBUG(logger(), "Loaded object '{}' ({} components)", obj->name,
+                  obj->components.size());
         scene->addObject(std::move(obj));
     }
 
     scene->onSceneReady();
 
+    LOG_INFO(logger(), "Loaded experiment '{}' ({} objects)", scene->getExperimentName(),
+             scene->getObjects().size());
     return scene;
 }
 

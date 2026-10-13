@@ -1,8 +1,6 @@
 #ifndef BLINKCOMPONENT_HPP
 #define BLINKCOMPONENT_HPP
 
-#include <iostream>
-
 #include "Component.hpp"
 
 namespace NeuronIDE {

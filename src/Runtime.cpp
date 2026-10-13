@@ -13,7 +13,7 @@
 #include <exception>
 #include <filesystem>
 #include <format>
-#include <iostream>
+#include <logging/Logging.hpp>
 #include <lslreader/LSLReader.hpp>
 #include <memory>
 #include <parser/Parser.hpp>
@@ -32,6 +32,8 @@ constexpr const char* kFallbackName = "experiment";
 
 // How often the window's events are handled while waiting for the EEG stream.
 constexpr auto kEventPollInterval = std::chrono::milliseconds(50);
+
+quill::Logger* logger() { return logging::logger(logging::Subsystem::Runtime); }
 
 std::string sdlError(const char* what) { return std::string(what) + ": " + SDL_GetError(); }
 
@@ -212,7 +214,8 @@ std::string Runtime::makeOutputPath() const {
 // True once samples are flowing; false if the window was closed or
 // requestStop() was called first.
 bool Runtime::awaitAcquisition() {
-    std::cerr << "Runtime: waiting for EEG stream '" << config.lsl.name << "'...\n";
+    LOG_INFO(logger(), "Waiting up to {} ms for EEG stream '{}'", acquisitionTimeout.count(),
+             config.lsl.name);
 
     const std::stop_token token    = stopSource.get_token();
     const auto            deadline = std::chrono::steady_clock::now() + acquisitionTimeout;
@@ -249,6 +252,7 @@ bool Runtime::awaitAcquisition() {
 void Runtime::startRecording() {
     outputFilePath = makeOutputPath();
     dataWriter->start(outputFilePath, eegQueue, markerQueue);
+    LOG_INFO(logger(), "Recording to '{}'", outputFilePath);
 }
 
 void Runtime::run() {
@@ -269,6 +273,8 @@ void Runtime::run() {
         if (awaitAcquisition()) {
             startRecording();
             renderer->render(stopSource.get_token());
+        } else {
+            LOG_INFO(logger(), "Stopped while waiting for the EEG stream; nothing was recorded");
         }
     } catch (...) {
         shutdown();
@@ -279,6 +285,7 @@ void Runtime::run() {
     if (lslReader->state() == AcquisitionState::Failed) {
         throwAcquisitionFailure("during the experiment; the recording was stopped");
     }
+    LOG_INFO(logger(), "Run finished");
 }
 
 void Runtime::requestStop() { stopSource.request_stop(); }
