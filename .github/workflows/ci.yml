@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
+env:
+  BUILD_DEPS: cmake ninja-build libsdl2-dev libsdl2-image-dev protobuf-compiler
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -17,17 +20,53 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake clang-format clang-tidy-20 libsdl2-dev libsdl2-image-dev protobuf-compiler gcovr
+        sudo apt-get install -y $BUILD_DEPS clang-format gcovr
 
     - name: Check Code Formatting
       run: |
         find src include tests -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" -o -name "*.h" \) | xargs clang-format --dry-run -Werror
 
     - name: Configure CMake
-      run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DNEURON_IDE_ENABLE_COVERAGE=ON
+      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEURON_IDE_ENABLE_COVERAGE=ON -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF
 
     - name: Build
-      run: cmake --build build --config Release
+      run: cmake --build build --parallel
 
     - name: Run Tests & Check Coverage
       run: cmake --build build --target coverage
+
+  clang-tidy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # On pull requests HEAD is the merge commit and HEAD^1 the base branch, which the
+        # changed-file list below diffs against.
+        fetch-depth: 2
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y $BUILD_DEPS clang-tidy-20
+
+    - name: Configure CMake
+      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF
+
+    - name: Generate protobuf headers
+      run: cmake --build build --target neuronide_proto
+
+    - name: Run clang-tidy
+      run: |
+        if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && git diff --quiet HEAD^1 HEAD -- .clang-tidy; then
+          files=$(git diff --name-only --diff-filter=d HEAD^1 HEAD -- \
+            'src/*.cpp' 'src/*.hpp' 'include/*.hpp' 'tests/*.cpp' 'tests/*.hpp')
+        else
+          files=$(git ls-files 'src/*.cpp' 'tests/*.cpp')
+        fi
+        if [ -z "$files" ]; then
+          echo "No C++ files changed."
+          exit 0
+        fi
+        echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p build --quiet

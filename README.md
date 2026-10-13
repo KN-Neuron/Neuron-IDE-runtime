@@ -35,7 +35,7 @@ EEG samples and the stimulus markers must share a **common clock domain** so tha
 | Concern                  | Choice                                                                 |
 | ------------------------ | ---------------------------------------------------------------------- |
 | Language                 | C++20                                                                  |
-| Build system             | CMake (≥ 3.25), Ninja-friendly                                         |
+| Build system             | CMake (≥ 3.25), Ninja recommended                                      |
 | Experiment file format   | Protocol Buffers (proto3) — see `protoFiles/neuronide.proto`           |
 | Device config format     | JSON (`config.json`) parsed with [nlohmann/json](https://github.com/nlohmann/json) |
 | EEG acquisition          | [LSL — Lab Streaming Layer](https://github.com/sccn/liblsl) (`liblsl`) |
@@ -495,20 +495,49 @@ All commands are run from the `Neuron-IDE-runtime/` directory.
 
 ```bash
 sudo apt update
-sudo apt install cmake clang-format clang-tidy libsdl2-dev libsdl2-image-dev protobuf-compiler gcovr
-# GTest, LSL and concurrentqueue are fetched automatically by CMake.
+sudo apt install cmake ninja-build clang-format clang-tidy-20 libsdl2-dev libsdl2-image-dev protobuf-compiler gcovr
+# GTest, LSL, concurrentqueue and nlohmann/json are fetched automatically by CMake.
 ```
 
 ### Configure & build
 
+Use the [Ninja](https://ninja-build.org/) generator: it builds on all CPU cores by default and
+rebuilds only what changed.
+
 ```bash
-cmake -B build
+cmake -B build -G Ninja
 cmake --build build
 ./build/src/NeuronIDE config.json experiment.neuroz  # waits for the EEG stream, then records and runs the experiment
 ```
 
+`-G Ninja` is needed only the first time you configure a build directory; CMake remembers it.
+A `build/` already configured with the default generator (Make) can't be switched, so delete it
+first (`rm -rf build`). If you stay on Make, build with `cmake --build build --parallel`;
+without `--parallel`, Make compiles one file at a time.
+
 `NeuronIDE` takes the path to a device `config.json` (defaults to `config.json` in
 the working directory).
+
+#### Faster builds without clang-tidy
+
+By default clang-tidy runs on every file during the build and takes several times longer than
+compiling it. While iterating, turn it off. The setting is remembered in `build/`; configure
+with `=ON` to turn it back on.
+
+```bash
+cmake -B build -G Ninja -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build build
+```
+
+CI still runs clang-tidy and fails on any warning, so run the same check before pushing. It
+reads the `compile_commands.json` that `CMAKE_EXPORT_COMPILE_COMMANDS` writes:
+
+```bash
+git ls-files 'src/*.cpp' 'tests/*.cpp' | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p build --quiet
+```
+
+Lines like `43669 warnings generated.` count warnings in third-party headers, which
+`.clang-tidy` filters out; only `error:` lines are problems.
 
 ### Tests
 
@@ -532,11 +561,13 @@ ctest -L component --output-on-failure
   ```bash
   cmake --build build --target format
   ```
+- clang-tidy runs as part of the build; see
+  [Faster builds without clang-tidy](#faster-builds-without-clang-tidy) to turn it off.
 
 ### Coverage
 
 ```bash
-cmake -B build -DNEURON_IDE_ENABLE_COVERAGE=ON
+cmake -B build -G Ninja -DNEURON_IDE_ENABLE_COVERAGE=ON
 cmake --build build
 cmake --build build --target coverage     # runs tests + gcovr
 xdg-open build/coverage/index.html
