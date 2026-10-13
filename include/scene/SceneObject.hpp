@@ -1,7 +1,6 @@
 #ifndef SCENEOBJECT_HPP
 #define SCENEOBJECT_HPP
 
-#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>

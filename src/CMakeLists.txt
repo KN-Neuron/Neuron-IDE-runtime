@@ -5,6 +5,7 @@ set_target_properties(neuronide_proto PROPERTIES CXX_CLANG_TIDY "")
 target_include_directories(neuronide_proto SYSTEM PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(neuronide_proto PUBLIC protobuf::libprotobuf)
 
+add_subdirectory(logging)
 add_subdirectory(scene)
 add_subdirectory(parser)
 add_subdirectory(config)
@@ -17,6 +18,7 @@ add_library(runtime_core STATIC
 )
 target_include_directories(runtime_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(runtime_core PUBLIC
+    logging
     scene
     parser
     config

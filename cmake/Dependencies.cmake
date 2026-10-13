@@ -35,6 +35,14 @@ FetchContent_Declare(
 )
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 
+# 5. Quill (header-only) - asynchronous logging
+FetchContent_Declare(
+  quill
+  URL https://github.com/odygrd/quill/archive/refs/tags/v13.0.0.tar.gz
+  URL_HASH SHA256=88b4a1542125577a4d51cf444c51e34d63618c422ba6a4fa9bd23894b49d696b
+  SYSTEM
+)
+
 # Suppress compiler warnings from third-party targets when compiling their source files
 set(BACKUP_C_FLAGS "${CMAKE_C_FLAGS}")
 set(BACKUP_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -46,14 +54,14 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /w")
 endif()
 
-FetchContent_MakeAvailable(googletest liblsl concurrentqueue nlohmann_json)
+FetchContent_MakeAvailable(googletest liblsl concurrentqueue nlohmann_json quill)
 
 # Restore compiler flags for our own project code
 set(CMAKE_C_FLAGS "${BACKUP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${BACKUP_CXX_FLAGS}")
 
-# 5. SDL2 (System installed)
+# 6. SDL2 (System installed)
 find_package(SDL2 REQUIRED)
 
-# 6. Protobuf (System installed)
+# 7. Protobuf (System installed)
 find_package(Protobuf REQUIRED)

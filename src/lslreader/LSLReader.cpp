@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <data_structures/EEGData.hpp>
 #include <exception>
-#include <iostream>
+#include <logging/Logging.hpp>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
@@ -24,6 +24,8 @@ constexpr int    kSenderChunkLength  = 0;    // 0: the sender decides chunk gran
 // and is re-resolved (and re-validated) here instead.
 constexpr bool   kRecoverSilently     = false;
 constexpr double kSampleRateTolerance = 0.5;  // Hz
+
+quill::Logger* logger() { return logging::logger(logging::Subsystem::LslReader); }
 
 // Offsets of the enabled channels within a pulled sample, in the order the
 // config declares them. Validates the config first: the reader indexes into raw
@@ -101,6 +103,11 @@ std::optional<lsl::stream_info> resolveStream(const LSLConfig&       config,
     }
     return std::nullopt;
 }
+
+void logStreamingStarted(const lsl::stream_info& info, std::size_t forwardedChannels) {
+    LOG_INFO(logger(), "Streaming from '{}' at {} Hz, forwarding {} of {} channels", info.name(),
+             info.nominal_srate(), forwardedChannels, info.channel_count());
+}
 }  // namespace
 
 LSLReader::LSLReader(DeviceConfig deviceConfig)
@@ -128,7 +135,7 @@ void LSLReader::start(std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>> eegQ
         try {
             readLoop(stopToken);
         } catch (const std::exception& e) {
-            std::cerr << "LSLReader: fatal error, stopping acquisition: " << e.what() << "\n";
+            LOG_ERROR(logger(), "Acquisition stopped: {}", e.what());
             fail(std::current_exception());
         }
     });
@@ -225,11 +232,11 @@ void LSLReader::readLoop(const std::stop_token& stopToken) {
                 if (!streaming) {
                     streaming = true;
                     setState(AcquisitionState::Streaming);
+                    logStreamingStarted(*info, enabledChannelIndices.size());
                 }
             }
         } catch (const lsl::lost_error& e) {
-            std::cerr << "LSLReader: stream '" << config.lsl.name << "' lost (" << e.what()
-                      << "), re-resolving\n";
+            LOG_WARNING(logger(), "Stream '{}' lost ({}); re-resolving", config.lsl.name, e.what());
         }
     }
 }
