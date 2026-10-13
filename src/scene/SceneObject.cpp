@@ -4,9 +4,7 @@
 
 #include "scene/components/Component.hpp"
 
-SceneObject::SceneObject(std::string n, bool visible) : name(std::move(n)), isVisible(visible) {
-    std::cout << "  [SceneObject] Utworzono obiekt: " << name << "\n";
-}
+SceneObject::SceneObject(std::string n, bool visible) : name(std::move(n)), isVisible(visible) {}
 
 void SceneObject::setTransform(const Transform& transform) { this->transform = transform; }
 

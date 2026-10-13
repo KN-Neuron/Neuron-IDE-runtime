@@ -12,3 +12,5 @@ target_link_libraries(lslreader PUBLIC
     concurrentqueue
     config
 )
+
+target_link_libraries(lslreader PRIVATE logging)
