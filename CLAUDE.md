@@ -5,10 +5,13 @@ You are in the **runtime** repo. Read the system overview below first.
 ## This repo
 
 - Build: `cmake -B build && cmake --build build`. Tests: `cd build && ctest --output-on-failure`
-  (`-L unit` / `-L component`). Format: `cmake --build build --target format` — CI fails on
-  unformatted code.
+  (`-L unit` / `-L component` / `-L cli`). Format: `cmake --build build --target format` — CI
+  fails on unformatted code.
 - Layout: `include/` headers, `src/` impl, `src/parser/Parser.cpp` turns a `.neuroz`/`.pb` file
-  into a `Scene`, `scene/components/` component classes, `tests/{unit,component}_tests/`.
+  into a `Scene`, `scene/components/` component classes, `tests/{unit,component,cli}_tests/`.
+- Logging: `LOG_*(logging::logger(logging::Subsystem::…), "…{}", …)` from
+  `<logging/Logging.hpp>` (Quill, README §3 "Logging"); never `std::cout` / `std::cerr`.
+  Nothing per frame or per sample. Level: `NEURONIDE_LOG_LEVEL`.
 - New component: subclass `Component`, add a static creator, and
   `REGISTER_COMPONENT(NeuronIDE::Component::k<Name>, Creator)` in its `.cpp`, then add it to
   `tests/registration_tests` (static self-registration is silently dropped unless executables
@@ -22,7 +25,8 @@ You are in the **runtime** repo. Read the system overview below first.
   device `config.json` is written by the launcher, which starts the runtime with `[config.json] <experiment.neuroz>`
   (#31). The output folder comes from `config.json` (`output.directory`), which the launcher
   sets to each run's own folder; distinct exit codes are part of the same contract, because
-  the launcher shows them to the experimenter (both in runtime#37).
+  the launcher shows them to the experimenter (both in runtime#37). Diagnostics go to stderr
+  as `<time> <LEVEL> [<subsystem>] <message>` lines; tell the launcher team if that changes.
 - `config.json` is also produced by the launcher (Python). Changing its keys or validation rules
   is a cross-team change: bump `config_version` and tell the launcher team.
 

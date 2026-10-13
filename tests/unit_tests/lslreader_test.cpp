@@ -7,13 +7,11 @@
 #include <config/DeviceConfig.hpp>
 #include <cstddef>
 #include <data_structures/EEGData.hpp>
-#include <iostream>
+#include <exception>
 #include <lslreader/LSLReader.hpp>
 #include <memory>
-#include <sstream>
 #include <stdexcept>
 #include <stop_token>
-#include <streambuf>
 #include <string>
 #include <thread>
 #include <utility>
@@ -34,24 +32,7 @@ constexpr auto   kDrainWait            = std::chrono::milliseconds(300);
 constexpr auto   kSubscribePoll        = std::chrono::milliseconds(20);
 constexpr double kRecoveryValue        = 42.0;
 
-constexpr auto kValidationWait = std::chrono::milliseconds(1500);
-constexpr auto kStateWait      = std::chrono::seconds(10);
-
-class ScopedStreamRedirect {
-   public:
-    ScopedStreamRedirect(std::ostream& stream, std::streambuf* buffer)
-        : stream(stream), previous(stream.rdbuf(buffer)) {}
-    ~ScopedStreamRedirect() { stream.rdbuf(previous); }
-
-    ScopedStreamRedirect(const ScopedStreamRedirect&)            = delete;
-    ScopedStreamRedirect& operator=(const ScopedStreamRedirect&) = delete;
-    ScopedStreamRedirect(ScopedStreamRedirect&&)                 = delete;
-    ScopedStreamRedirect& operator=(ScopedStreamRedirect&&)      = delete;
-
-   private:
-    std::ostream&   stream;
-    std::streambuf* previous;
-};
+constexpr auto kStateWait = std::chrono::seconds(10);
 
 // All channels enabled, declared in stream order.
 std::vector<ChannelConfig> makeChannels() {
@@ -121,39 +102,57 @@ void pushSamples(lsl::stream_outlet& outlet, const std::vector<double>& sample, 
     }
 }
 
-std::string runAndCaptureDiagnostics(const DeviceConfig& config, int channelCount,
-                                     double sampleRate) {
-    lsl::stream_outlet outlet   = makeOutletWithShape(config, channelCount, sampleRate);
-    auto               eegQueue = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
-    LSLReader          reader(config);
-
-    std::ostringstream captured;
-    {
-        const ScopedStreamRedirect redirect(std::cerr, captured.rdbuf());
-        reader.start(eegQueue);
-        std::this_thread::sleep_for(kValidationWait);
-        reader.stop();
+// Polls, because LSLReader only offers to wait while it is Resolving.
+bool waitForState(const LSLReader& reader, AcquisitionState expected,
+                  std::chrono::steady_clock::duration timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    while (reader.state() != expected) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            return false;
+        }
+        std::this_thread::sleep_for(kSubscribePoll);
     }
-
-    EEGData received;
-    EXPECT_FALSE(eegQueue->try_dequeue(received)) << "a rejected stream must yield no samples";
-    return captured.str();
+    return true;
 }
 
-// Starts the reader with its diagnostics silenced, waits while it resolves, and
-// stops it. Returns the state the wait ended on.
+// Starts the reader, waits while it resolves, and stops it. Returns the state
+// the wait ended on.
 AcquisitionState startWaitAndStop(
     LSLReader& reader, const std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>>& eegQueue,
-    LSLReader::FailureCallback onFailure) {
-    std::ostringstream         captured;
-    const ScopedStreamRedirect redirect(std::cerr, captured.rdbuf());
-
+    LSLReader::FailureCallback onFailure = {}) {
     reader.start(eegQueue, std::move(onFailure));
     const std::stop_source neverStopped;
     const AcquisitionState reached = reader.waitWhileResolving(
         std::chrono::steady_clock::now() + kStateWait, neverStopped.get_token());
     reader.stop();
     return reached;
+}
+
+std::string failureMessage(const LSLReader& reader) {
+    const std::exception_ptr failure = reader.failure();
+    if (!failure) {
+        return {};
+    }
+    try {
+        std::rethrow_exception(failure);
+    } catch (const std::exception& e) {
+        return e.what();
+    } catch (...) {
+        return "non-standard exception";
+    }
+}
+
+// Offers the reader a stream of the given shape and returns why it rejected it.
+std::string rejectionReason(const DeviceConfig& config, int channelCount, double sampleRate) {
+    lsl::stream_outlet outlet   = makeOutletWithShape(config, channelCount, sampleRate);
+    auto               eegQueue = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
+    LSLReader          reader(config);
+
+    EXPECT_EQ(startWaitAndStop(reader, eegQueue), AcquisitionState::Failed);
+
+    EEGData received;
+    EXPECT_FALSE(eegQueue->try_dequeue(received)) << "a rejected stream must yield no samples";
+    return failureMessage(reader);
 }
 
 // Keeps pushing a marked sample until one of them comes back through the queue,
@@ -253,36 +252,35 @@ TEST(LSLReaderTest, ReResolvesStreamAfterItIsLost) {
     config.lsl.name     = "neuronide_test_lost_stream";
     config.lsl.sourceId = "neuronide-test-lost";
 
-    auto      eegQueue = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
-    LSLReader reader(config);
+    auto                   eegQueue = std::make_shared<moodycamel::ConcurrentQueue<EEGData>>();
+    LSLReader              reader(config);
+    const std::stop_source neverStopped;
 
-    std::ostringstream captured;
     {
-        const ScopedStreamRedirect redirect(std::cerr, captured.rdbuf());
+        lsl::stream_outlet outlet = makeOutlet(config);
+        reader.start(eegQueue);
+        ASSERT_TRUE(waitForConsumer(outlet, kRecoveryWait))
+            << "LSLReader did not subscribe (needs loopback)";
+        pushSamples(outlet, makeSample(), kSamplesToPush);
+        ASSERT_EQ(reader.waitWhileResolving(std::chrono::steady_clock::now() + kStateWait,
+                                            neverStopped.get_token()),
+                  AcquisitionState::Streaming);
+    }  // outlet gone: the inlet's pull must raise lsl::lost_error
 
-        {
-            lsl::stream_outlet outlet = makeOutlet(config);
-            reader.start(eegQueue);
-            ASSERT_TRUE(waitForConsumer(outlet, kRecoveryWait))
-                << "LSLReader did not subscribe (needs loopback)";
-            pushSamples(outlet, makeSample(), kSamplesToPush);
-        }  // outlet gone: the inlet's pull must raise lsl::lost_error
+    // Had liblsl recovered the inlet silently, the reader would still be Streaming.
+    EXPECT_TRUE(waitForState(reader, AcquisitionState::Resolving, kRecoveryWait))
+        << "the drop should surface as lsl::lost_error and be re-resolved";
 
-        lsl::stream_outlet revived = makeOutlet(config);
-        ASSERT_TRUE(waitForConsumer(revived, kRecoveryWait))
-            << "LSLReader did not re-resolve the stream after it was lost";
+    lsl::stream_outlet revived = makeOutlet(config);
+    ASSERT_TRUE(waitForConsumer(revived, kRecoveryWait))
+        << "LSLReader did not re-resolve the stream after it was lost";
 
-        EXPECT_TRUE(pushUntilReceived(revived, *eegQueue, kRecoveryValue, kRecoveryWait))
-            << "no samples arrived after the stream came back";
+    EXPECT_TRUE(pushUntilReceived(revived, *eegQueue, kRecoveryValue, kRecoveryWait))
+        << "no samples arrived after the stream came back";
 
-        reader.stop();
-    }
-
-    const std::string log = captured.str();
-    EXPECT_NE(log.find("lost"), std::string::npos)
-        << "the drop should surface as lsl::lost_error and be re-resolved, got: " << log;
-    EXPECT_EQ(log.find("fatal error"), std::string::npos)
-        << "a dropped stream must not stop acquisition, got: " << log;
+    reader.stop();
+    EXPECT_EQ(reader.failure(), nullptr)
+        << "a dropped stream must not stop acquisition, got: " << failureMessage(reader);
 }
 
 TEST(LSLReaderTest, RejectsStreamWithMismatchedChannelCount) {
@@ -290,9 +288,9 @@ TEST(LSLReaderTest, RejectsStreamWithMismatchedChannelCount) {
     config.lsl.name     = "neuronide_test_chan_mismatch";
     config.lsl.sourceId = "neuronide-test-chan";
 
-    const std::string log = runAndCaptureDiagnostics(config, kMismatchedChannels, kSampleRate);
-    EXPECT_NE(log.find("channels"), std::string::npos)
-        << "expected a channel-count rejection, got: " << log;
+    const std::string reason = rejectionReason(config, kMismatchedChannels, kSampleRate);
+    EXPECT_NE(reason.find("channels"), std::string::npos)
+        << "expected a channel-count rejection, got: " << reason;
 }
 
 TEST(LSLReaderTest, RejectsStreamWithMismatchedSampleRate) {
@@ -300,9 +298,9 @@ TEST(LSLReaderTest, RejectsStreamWithMismatchedSampleRate) {
     config.lsl.name     = "neuronide_test_rate_mismatch";
     config.lsl.sourceId = "neuronide-test-rate";
 
-    const std::string log = runAndCaptureDiagnostics(config, kChannelCount, kMismatchedSampleRate);
-    EXPECT_NE(log.find("Hz"), std::string::npos)
-        << "expected a sample-rate rejection, got: " << log;
+    const std::string reason = rejectionReason(config, kChannelCount, kMismatchedSampleRate);
+    EXPECT_NE(reason.find("Hz"), std::string::npos)
+        << "expected a sample-rate rejection, got: " << reason;
 }
 
 TEST(LSLReaderTest, StopBeforeStreamResolvedExitsCleanly) {

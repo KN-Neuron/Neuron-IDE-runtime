@@ -2,7 +2,7 @@
 #define PARSER_HPP
 
 #include <filesystem>
-#include <iostream>
+#include <iosfwd>
 #include <memory>
 #include <string>
 
