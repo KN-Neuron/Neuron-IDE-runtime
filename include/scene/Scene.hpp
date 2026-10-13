@@ -28,6 +28,7 @@ class Scene {
     void render(SDL_Renderer* renderer);
 
     void      onSceneReady();
+    void      onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target);
     Delegate& resolveEvents(std::string_view objectName, std::string_view eventName);
 };
 

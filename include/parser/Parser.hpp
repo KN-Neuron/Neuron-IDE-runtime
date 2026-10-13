@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "scene/components/ComponentBuildContext.hpp"
+
 class Scene;
 class SceneObject;
 class Component;
@@ -18,13 +20,19 @@ class Parser {
    public:
     Parser() = default;
 
+    // Relative asset paths in the scene (e.g. sprite images) resolve against the folder holding
+    // filePath.
     static std::shared_ptr<Scene> parse(const std::string& filePath);
-    static std::shared_ptr<Scene> parseStream(std::istream& stream);
+    // Relative asset paths resolve against context.assetRoot: the working directory by default.
+    static std::shared_ptr<Scene> parseStream(std::istream&                stream,
+                                              const ComponentBuildContext& context = {});
 
    private:
-    static std::shared_ptr<SceneObject> buildSceneObject(const NeuronIDE::SceneObject& protoObj);
+    static std::shared_ptr<SceneObject> buildSceneObject(const NeuronIDE::SceneObject& protoObj,
+                                                         const ComponentBuildContext&  context);
     static std::unique_ptr<Component>   buildComponent(const NeuronIDE::Component&         protoComp,
-                                                       const std::shared_ptr<SceneObject>& owner);
+                                                       const std::shared_ptr<SceneObject>& owner,
+                                                       const ComponentBuildContext&        context);
 };
 
 #endif  // PARSER_HPP

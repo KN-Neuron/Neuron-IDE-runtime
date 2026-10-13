@@ -5,8 +5,9 @@
 
 void BlinkComponent::setFrequency(double freq) { blinkFrequencyHz = freq; }
 
-std::unique_ptr<Component> BlinkComponent::createBlinker(
-    const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner) {
+std::unique_ptr<Component> BlinkComponent::createBlinker(const NeuronIDE::Component& protoComp,
+                                                         const std::shared_ptr<SceneObject>& owner,
+                                                         const ComponentBuildContext& /*context*/) {
     return std::make_unique<BlinkComponent>(owner, protoComp.blinker().blink_frequency_hz());
 }
 

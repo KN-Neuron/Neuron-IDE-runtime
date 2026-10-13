@@ -28,6 +28,14 @@ void Scene::onSceneReady() {
     }
 }
 
+void Scene::onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target) {
+    for (const auto& obj : objects) {
+        for (const auto& comp : obj->components) {
+            comp->onRenderTargetReady(target);
+        }
+    }
+}
+
 Delegate& Scene::resolveEvents(std::string_view objectName, std::string_view eventName) {
     for (const auto& obj : objects) {
         if (obj->name != objectName) {

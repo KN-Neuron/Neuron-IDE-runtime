@@ -8,6 +8,7 @@
 namespace NeuronIDE {
 class Component;
 }
+struct ComponentBuildContext;
 
 class BlinkComponent : public Component {
    public:
@@ -19,7 +20,8 @@ class BlinkComponent : public Component {
     void render(SDL_Renderer* renderer) override;
 
     static std::unique_ptr<Component> createBlinker(const NeuronIDE::Component&         protoComp,
-                                                    const std::shared_ptr<SceneObject>& owner);
+                                                    const std::shared_ptr<SceneObject>& owner,
+                                                    const ComponentBuildContext&        context);
 
    private:
     double blinkFrequencyHz = 0.0;

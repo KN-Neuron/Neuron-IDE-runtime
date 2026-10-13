@@ -16,7 +16,13 @@ Renderer::Renderer(const std::shared_ptr<Scene>& scene, std::shared_ptr<SDL_Rend
     : window(nullptr, SDLWindowDeleter{}),
       sdlRenderer(std::move(sdlRenderer)),
       currentScene(scene),
-      markerQueue(std::move(markerQueue)) {}
+      markerQueue(std::move(markerQueue)) {
+    // Resources are created here rather than on the first frame, so uploads never delay the
+    // first stimulus frame and the marker stamped with it.
+    if (scene && this->sdlRenderer) {
+        scene->onRenderTargetReady(this->sdlRenderer);
+    }
+}
 
 void Renderer::render(const std::stop_token& stoken) {
     std::vector<std::string> currentFrameMarkers;

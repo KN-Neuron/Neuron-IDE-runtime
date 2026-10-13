@@ -12,11 +12,11 @@ add_subdirectory(renderer)
 add_subdirectory(lslreader)
 add_subdirectory(datawriter)
 
-add_library(runtime_core STATIC
+add_library(runtime_core_archive STATIC
     Runtime.cpp
 )
-target_include_directories(runtime_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
-target_link_libraries(runtime_core PUBLIC
+target_include_directories(runtime_core_archive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_link_libraries(runtime_core_archive PUBLIC
     scene
     parser
     config
@@ -24,6 +24,12 @@ target_link_libraries(runtime_core PUBLIC
     lslreader
     datawriter
 )
+
+# Components register themselves from static initializers (REGISTER_COMPONENT) in object files
+# nothing else references. A plain static link drops those objects, and the parser then skips
+# every component of that type without a word. Link `runtime_core`, never the archive itself.
+add_library(runtime_core INTERFACE)
+target_link_libraries(runtime_core INTERFACE "$<LINK_LIBRARY:WHOLE_ARCHIVE,runtime_core_archive>")
 
 add_executable(NeuronIDE main.cpp)
 target_link_libraries(NeuronIDE PRIVATE runtime_core)

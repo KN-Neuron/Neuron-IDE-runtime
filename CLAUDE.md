@@ -10,8 +10,10 @@ You are in the **runtime** repo. Read the system overview below first.
 - Layout: `include/` headers, `src/` impl, `src/parser/Parser.cpp` turns a `.neuroz`/`.pb` file
   into a `Scene`, `scene/components/` component classes, `tests/{unit,component}_tests/`.
 - New component: subclass `Component`, add a static creator, and
-  `REGISTER_COMPONENT(NeuronIDE::Component::k<Name>, Creator)` in its `.cpp`. The proto oneof
-  entry must exist first — which means a backend change too.
+  `REGISTER_COMPONENT(NeuronIDE::Component::k<Name>, Creator)` in its `.cpp`, then add it to
+  `tests/registration_tests` (static self-registration is silently dropped unless executables
+  link the `runtime_core` target). The proto oneof entry must exist first — which means a
+  backend change too.
 - Test scenes: write `.pbtxt`, then
   `protoc --encode=NeuronIDE.Scene protoFiles/neuronide.proto < x.pbtxt > x.pb`.
 - Read README §3 (architecture: Renderer / LSLReader / DataWriter threads) and §5 (what goes in
@@ -96,7 +98,9 @@ launcher#1.
 
 ### Known cross-repo gaps (as of 2026-10-09 — fix them or update this list)
 
-- Proto copies have diverged: backend lacks `MarkerEmitterComponent` (backend#23).
+- Proto copies have diverged: backend lacks `MarkerEmitterComponent` (backend#23), and the
+  runtime reserved `SpriteRenderer.texture_path` (field 1) in favour of `img_path`; the backend
+  and launcher copies must follow.
 - Experiment flow graph is not in the proto, so it isn't saved, exported or run (epic frontend#59).
 - Scene object color and LSL marker are not persisted (frontend#56, backend#24).
 - Media files (images, audio, scripts) can't be uploaded, so the runtime can't find them (backend#25).

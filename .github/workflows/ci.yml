@@ -7,7 +7,7 @@ on:
     branches: [ "main", "master" ]
 
 env:
-  BUILD_DEPS: cmake ninja-build libsdl2-dev protobuf-compiler
+  BUILD_DEPS: cmake ninja-build libsdl2-dev libsdl2-image-dev protobuf-compiler
 
 jobs:
   build-and-test:

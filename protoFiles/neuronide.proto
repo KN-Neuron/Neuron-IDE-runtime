@@ -3,7 +3,9 @@ syntax = "proto3";
 package NeuronIDE;
 
 message SpriteRenderer {
-  string texture_path = 1;
+  reserved 1;
+  reserved "texture_path";
+  // Image file. A relative path resolves against the folder holding the .neuroz file.
   string img_path = 2;
 }
 

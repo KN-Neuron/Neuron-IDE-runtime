@@ -1,5 +1,6 @@
 #include "parser/Parser.hpp"
 
+#include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <unordered_set>
@@ -16,15 +17,19 @@ std::shared_ptr<Scene> Parser::parse(const std::string& filePath) {
         throw std::runtime_error("Parser: cannot open file: " + filePath);
     }
 
+    const ComponentBuildContext context{.assetRoot =
+                                            std::filesystem::absolute(filePath).parent_path()};
+
     try {
-        return parseStream(file);
+        return parseStream(file, context);
     } catch (const std::runtime_error& e) {
         throw std::runtime_error(std::string("Parser: failed to parse file ") + filePath + " - " +
                                  e.what());
     }
 }
 
-std::shared_ptr<Scene> Parser::parseStream(std::istream& stream) {
+std::shared_ptr<Scene> Parser::parseStream(std::istream&                stream,
+                                           const ComponentBuildContext& context) {
     NeuronIDE::Scene protoScene;
 
     if (!protoScene.ParseFromIstream(&stream)) {
@@ -39,7 +44,7 @@ std::shared_ptr<Scene> Parser::parseStream(std::istream& stream) {
     scene->setExperimentName(protoScene.project_name());
 
     for (const auto& protoObj : protoScene.scene_objects()) {
-        auto obj = buildSceneObject(protoObj);
+        auto obj = buildSceneObject(protoObj, context);
         scene->addObject(std::move(obj));
     }
 
@@ -48,7 +53,8 @@ std::shared_ptr<Scene> Parser::parseStream(std::istream& stream) {
     return scene;
 }
 
-std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObject& protoObj) {
+std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObject& protoObj,
+                                                      const ComponentBuildContext&  context) {
     if (protoObj.name().empty()) {
         throw std::invalid_argument("SceneObject name cannot be empty");
     }
@@ -71,7 +77,7 @@ std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObje
         }
         seenComponentTypes.insert(typeId);
 
-        auto comp = buildComponent(protoComp, obj);
+        auto comp = buildComponent(protoComp, obj, context);
         if (comp) {
             obj->addComponent(std::move(comp));
         }
@@ -81,6 +87,7 @@ std::shared_ptr<SceneObject> Parser::buildSceneObject(const NeuronIDE::SceneObje
 }
 
 std::unique_ptr<Component> Parser::buildComponent(const NeuronIDE::Component&         protoComp,
-                                                  const std::shared_ptr<SceneObject>& owner) {
-    return ComponentRegistry::instance().build(protoComp, owner);
+                                                  const std::shared_ptr<SceneObject>& owner,
+                                                  const ComponentBuildContext&        context) {
+    return ComponentRegistry::instance().build(protoComp, owner, context);
 }
