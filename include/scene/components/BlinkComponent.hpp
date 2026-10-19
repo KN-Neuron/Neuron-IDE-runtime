@@ -8,7 +8,7 @@
 namespace NeuronIDE {
 class Component;
 }
-struct ComponentBuildContext;
+class ComponentBuildContext;
 
 class BlinkComponent : public Component {
    public:

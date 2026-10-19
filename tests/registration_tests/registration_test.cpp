@@ -42,8 +42,7 @@ TEST(ComponentRegistrationTest, EveryImplementedComponentIsLinkedIn) {
 
     std::stringstream stream;
     ASSERT_TRUE(proto.SerializeToOstream(&stream));
-    const auto scene =
-        Parser::parseStream(stream, ComponentBuildContext{.assetRoot = assets.path()});
+    const auto scene = Parser::parseStream(stream, assets.path());
 
     for (const auto& object : scene->getObjects()) {
         EXPECT_EQ(object->components.size(), 1U)

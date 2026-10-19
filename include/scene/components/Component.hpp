@@ -26,9 +26,10 @@ class Component {
 
     virtual void onSceneReady(Scene& scene) { (void)scene; }
 
-    // Called once the render target this scene is drawn to exists, before the first frame: the
-    // place to create GPU resources such as textures. SDL frees a renderer's textures along with
-    // it, so a component holding any keeps `target` alive for as long as it does.
+    // Called once the render target this scene is drawn to exists, before the first frame, and
+    // again whenever the target has lost its textures (SDL_RENDER_DEVICE_RESET): the place to
+    // (re)create GPU resources. SDL frees a renderer's textures along with it, so a component
+    // holding any keeps `target` alive for as long as it does.
     virtual void onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target) { (void)target; }
 
     virtual Delegate* getEvent(std::string_view eventName) {

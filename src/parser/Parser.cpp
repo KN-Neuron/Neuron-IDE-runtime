@@ -9,6 +9,7 @@
 #include "scene/Scene.hpp"
 #include "scene/SceneObject.hpp"
 #include "scene/components/Component.hpp"
+#include "scene/components/ComponentBuildContext.hpp"
 #include "scene/components/ComponentRegistry.hpp"
 
 std::shared_ptr<Scene> Parser::parse(const std::string& filePath) {
@@ -17,11 +18,8 @@ std::shared_ptr<Scene> Parser::parse(const std::string& filePath) {
         throw std::runtime_error("Parser: cannot open file: " + filePath);
     }
 
-    const ComponentBuildContext context{.assetRoot =
-                                            std::filesystem::absolute(filePath).parent_path()};
-
     try {
-        return parseStream(file, context);
+        return parseStream(file, std::filesystem::absolute(filePath).parent_path());
     } catch (const std::runtime_error& e) {
         throw std::runtime_error(std::string("Parser: failed to parse file ") + filePath + " - " +
                                  e.what());
@@ -29,7 +27,7 @@ std::shared_ptr<Scene> Parser::parse(const std::string& filePath) {
 }
 
 std::shared_ptr<Scene> Parser::parseStream(std::istream&                stream,
-                                           const ComponentBuildContext& context) {
+                                           const std::filesystem::path& assetRoot) {
     NeuronIDE::Scene protoScene;
 
     if (!protoScene.ParseFromIstream(&stream)) {
@@ -42,6 +40,7 @@ std::shared_ptr<Scene> Parser::parseStream(std::istream&                stream,
 
     auto scene = std::make_shared<::Scene>();
     scene->setExperimentName(protoScene.project_name());
+    const ComponentBuildContext context(assetRoot, scene->images());
 
     for (const auto& protoObj : protoScene.scene_objects()) {
         auto obj = buildSceneObject(protoObj, context);

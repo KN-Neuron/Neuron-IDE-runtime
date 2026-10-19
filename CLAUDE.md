@@ -98,9 +98,7 @@ launcher#1.
 
 ### Known cross-repo gaps (as of 2026-10-09 — fix them or update this list)
 
-- Proto copies have diverged: backend lacks `MarkerEmitterComponent` (backend#23), and the
-  runtime reserved `SpriteRenderer.texture_path` (field 1) in favour of `img_path`; the backend
-  and launcher copies must follow.
+- Proto copies have diverged: backend lacks `MarkerEmitterComponent` (backend#23).
 - Experiment flow graph is not in the proto, so it isn't saved, exported or run (epic frontend#59).
 - Scene object color and LSL marker are not persisted (frontend#56, backend#24).
 - Media files (images, audio, scripts) can't be uploaded, so the runtime can't find them (backend#25).

@@ -10,7 +10,7 @@ namespace NeuronIDE {
 class Component;
 }
 class SceneObject;
-struct ComponentBuildContext;
+class ComponentBuildContext;
 
 using ComponentCreatorFunc = std::function<std::unique_ptr<Component>(
     const NeuronIDE::Component&, const std::shared_ptr<SceneObject>&,

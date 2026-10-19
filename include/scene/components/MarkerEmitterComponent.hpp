@@ -10,7 +10,7 @@
 #include "scene/components/Component.hpp"
 
 class Scene;
-struct ComponentBuildContext;
+class ComponentBuildContext;
 
 namespace NeuronIDE {
 class Component;

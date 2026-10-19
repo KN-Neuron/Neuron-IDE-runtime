@@ -19,9 +19,27 @@ Renderer::Renderer(const std::shared_ptr<Scene>& scene, std::shared_ptr<SDL_Rend
       markerQueue(std::move(markerQueue)) {
     // Resources are created here rather than on the first frame, so uploads never delay the
     // first stimulus frame and the marker stamped with it.
-    if (scene && this->sdlRenderer) {
-        scene->onRenderTargetReady(this->sdlRenderer);
+    prepareScene();
+}
+
+void Renderer::prepareScene() {
+    if (auto scene = currentScene.lock(); scene && sdlRenderer) {
+        scene->onRenderTargetReady(sdlRenderer);
     }
+}
+
+bool Renderer::pollEvents() {
+    bool      quit = false;
+    SDL_Event event{};
+    while (SDL_PollEvent(&event) == 1) {
+        if (event.type == SDL_QUIT) {
+            quit = true;
+        } else if (event.type == SDL_RENDER_DEVICE_RESET) {
+            // Every texture is gone (e.g. Direct3D after a lock screen or UAC prompt).
+            prepareScene();
+        }
+    }
+    return quit;
 }
 
 void Renderer::render(const std::stop_token& stoken) {
@@ -36,11 +54,8 @@ void Renderer::render(const std::stop_token& stoken) {
         currentFrameMarkers.clear();
         Context ctx{deltaTime, &currentFrameMarkers};
 
-        SDL_Event event;
-        while (SDL_PollEvent(&event) == 1) {
-            if (event.type == SDL_QUIT) {
-                return;
-            }
+        if (pollEvents()) {
+            return;
         }
 
         if (auto scene = currentScene.lock()) {

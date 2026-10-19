@@ -1,46 +1,50 @@
 #include "scene/components/SpriteRenderer.hpp"
 
 #include <SDL2/SDL.h>
-#include <SDL_image.h>
 
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
 #include "neuronide.pb.h"
+#include "scene/Image.hpp"
 #include "scene/SceneObject.hpp"
 #include "scene/components/ComponentBuildContext.hpp"
 #include "scene/components/ComponentRegistry.hpp"
 
-void SpriteRenderer::SurfaceDeleter::operator()(SDL_Surface* surface) const noexcept {
-    SDL_FreeSurface(surface);
+namespace {
+// SDL draws in float, and converting a double outside float range is undefined. Also false for
+// NaN and infinity.
+bool fitsInFloat(double value) {
+    return std::abs(value) <= static_cast<double>(std::numeric_limits<float>::max());
 }
 
-void SpriteRenderer::TextureDeleter::operator()(SDL_Texture* texture) const noexcept {
-    SDL_DestroyTexture(texture);
-}
+std::string describe(const SceneObject& owner) { return "SpriteRenderer on '" + owner.name + "'"; }
+}  // namespace
 
 SpriteRenderer::SpriteRenderer(const std::shared_ptr<SceneObject>& owner,
-                               std::filesystem::path               path)
-    : Component(owner), imagePath(std::move(path)) {
+                               std::shared_ptr<const Image>        image)
+    : Component(owner), image(std::move(image)) {
     if (!owner) {
         throw std::invalid_argument("SpriteRenderer: owner must not be null");
     }
-    const std::string where = "SpriteRenderer on '" + owner->name + "'";
-
-    if (imagePath.empty()) {
-        throw std::invalid_argument(where + ": image path is empty");
-    }
-    // Written so that a NaN size is rejected too.
-    const bool hasArea = owner->transform.width > 0.0 && owner->transform.height > 0.0;
-    if (!hasArea) {
-        throw std::invalid_argument(where + ": the object needs a positive width and height");
+    if (!this->image) {
+        return;
     }
 
-    image.reset(IMG_Load(imagePath.string().c_str()));
-    if (!image) {
-        throw std::runtime_error(where + ": cannot load image '" + imagePath.string() +
-                                 "': " + IMG_GetError());
+    const auto& transform = owner->transform;
+    for (const double value :
+         {transform.posX, transform.posY, transform.width, transform.height, transform.rotation}) {
+        if (!fitsInFloat(value)) {
+            throw std::invalid_argument(describe(*owner) +
+                                        ": the transform has a non-finite or out-of-range value");
+        }
+    }
+    if (transform.width <= 0.0 || transform.height <= 0.0) {
+        throw std::invalid_argument(describe(*owner) +
+                                    ": the object needs a positive width and height");
     }
 }
 
@@ -48,7 +52,7 @@ void SpriteRenderer::update(const Context& context) { (void)context; }
 
 void SpriteRenderer::render(SDL_Renderer* renderer) {
     const auto ownerPtr = owner.lock();
-    if (renderer == nullptr || !texture || !ownerPtr) {
+    if (renderer == nullptr || !image || image->texture() == nullptr || !ownerPtr) {
         return;
     }
 
@@ -58,33 +62,19 @@ void SpriteRenderer::render(SDL_Renderer* renderer) {
         static_cast<float>(transform.width), static_cast<float>(transform.height)};
 
     // A null centre rotates about the centre of `destination`.
-    SDL_RenderCopyExF(renderer, texture.get(), nullptr, &destination, transform.rotation, nullptr,
-                      SDL_FLIP_NONE);
-}
-
-void SpriteRenderer::onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target) {
-    if (!target) {
-        throw std::invalid_argument("SpriteRenderer: render target must not be null");
+    if (SDL_RenderCopyExF(renderer, image->texture(), nullptr, &destination, transform.rotation,
+                          nullptr, SDL_FLIP_NONE) != 0) {
+        throw std::runtime_error(describe(*ownerPtr) + ": cannot draw '" + image->path().string() +
+                                 "': " + SDL_GetError());
     }
-    if (!image) {
-        throw std::logic_error("SpriteRenderer: '" + imagePath.string() +
-                               "' is already uploaded to a render target");
-    }
-
-    SDL_Texture* created = SDL_CreateTextureFromSurface(target.get(), image.get());
-    if (created == nullptr) {
-        throw std::runtime_error("SpriteRenderer: cannot create a texture from '" +
-                                 imagePath.string() + "': " + SDL_GetError());
-    }
-    texture = std::unique_ptr<SDL_Texture, TextureDeleter>(created, TextureDeleter{target});
-    image.reset();
 }
 
 std::unique_ptr<Component> SpriteRenderer::createSprite(const NeuronIDE::Component& protoComp,
                                                         const std::shared_ptr<SceneObject>& owner,
                                                         const ComponentBuildContext& context) {
+    const std::string& path = protoComp.renderer().img_path();
     return std::make_unique<SpriteRenderer>(owner,
-                                            context.resolveAsset(protoComp.renderer().img_path()));
+                                            path.empty() ? nullptr : context.loadImage(path));
 }
 
 REGISTER_COMPONENT(NeuronIDE::Component::kRenderer, SpriteRenderer::createSprite)

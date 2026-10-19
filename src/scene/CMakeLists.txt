@@ -1,6 +1,8 @@
 add_library(scene OBJECT
     SceneObject.cpp
     Scene.cpp
+    Image.cpp
+    ImageLibrary.cpp
     components/ComponentRegistry.cpp
     components/BlinkComponent.cpp
     components/MarkerEmitterComponent.cpp

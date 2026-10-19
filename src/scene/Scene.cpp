@@ -29,6 +29,7 @@ void Scene::onSceneReady() {
 }
 
 void Scene::onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target) {
+    imageLibrary.upload(target);
     for (const auto& obj : objects) {
         for (const auto& comp : obj->components) {
             comp->onRenderTargetReady(target);

@@ -73,19 +73,6 @@ std::string describe(const std::exception_ptr& error) {
         return "unknown error";
     }
 }
-
-// Handles every pending window event, so the window stays responsive while
-// nothing is being rendered yet, and reports whether the operator closed it.
-bool quitRequested() {
-    bool      quit = false;
-    SDL_Event event{};
-    while (SDL_PollEvent(&event) == 1) {
-        if (event.type == SDL_QUIT) {
-            quit = true;
-        }
-    }
-    return quit;
-}
 }  // namespace
 
 Runtime::SdlSession::SdlSession() {
@@ -111,9 +98,11 @@ Runtime::RenderTargetFactory Runtime::defaultRenderTargetFactory() {
                                      " display(s) are connected");
         }
 
-        // Desktop fullscreen keeps the monitor's native mode: no mode switch,
-        // and the compositor can hand the window the display directly.
-        Uint32 windowFlags = SDL_WINDOW_SHOWN;
+        // Hidden until Runtime has uploaded the scene, so a failed upload
+        // never flashes a window at the participant. Desktop fullscreen keeps
+        // the monitor's native mode: no mode switch, and the compositor can
+        // hand the window the display directly.
+        Uint32 windowFlags = SDL_WINDOW_HIDDEN;
         if (display.fullscreen) {
             windowFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
         }
@@ -181,7 +170,8 @@ Runtime::Runtime(const RuntimePaths& paths, const RenderTargetFactory& renderTar
     }
 
     // Everything that can still reject the configuration runs before the window
-    // opens, so a bad config fails without flashing a window at the participant.
+    // is created, and the window is shown only once the scene is on the GPU, so
+    // bad input fails without flashing a window at the participant.
     auto formatStrategy = DataFormatStrategyFactory::create(config.output.format);
     outputExtension     = formatStrategy->fileExtension();
 
@@ -194,6 +184,11 @@ Runtime::Runtime(const RuntimePaths& paths, const RenderTargetFactory& renderTar
     }
 
     renderer = std::make_unique<Renderer>(scene, sdlRenderer, markerQueue);
+
+    // Null for a render target without a window, such as a software renderer.
+    if (SDL_Window* window = SDL_RenderGetWindow(sdlRenderer.get())) {
+        SDL_ShowWindow(window);
+    }
 }
 
 Runtime::~Runtime() { shutdown(); }
@@ -223,7 +218,7 @@ bool Runtime::awaitAcquisition() {
     const auto            deadline = std::chrono::steady_clock::now() + acquisitionTimeout;
 
     while (!token.stop_requested()) {
-        if (quitRequested()) {
+        if (renderer->pollEvents()) {
             return false;
         }
 

@@ -153,13 +153,21 @@ After construction, a component goes through two hooks, both before the first fr
 1. `onSceneReady(Scene&)`, called by `Parser` once every object exists, to resolve
    and subscribe to events.
 2. `onRenderTargetReady(const std::shared_ptr<SDL_Renderer>&)`, called by the
-   `Renderer` constructor once the window exists, to create GPU resources such as
-   textures. Doing it there, not lazily on the first `render()`, keeps uploads from
-   delaying the first stimulus frame and its marker. SDL frees a renderer's textures
-   along with it, so a component holding textures keeps the target alive.
+   `Renderer` constructor once the render target exists, to create GPU resources such
+   as textures, and again after `SDL_RENDER_DEVICE_RESET`, which loses every texture.
+   Doing it there, not lazily on the first `render()`, keeps uploads from delaying the
+   first stimulus frame and its marker. SDL frees a renderer's textures along with it,
+   so a component holding textures keeps the target alive.
+
+Images are decoded during parsing into the scene's `ImageLibrary`, once per file however
+many sprites show it, and the library uploads them just before the components' hook
+runs. The decoded pixels are kept, so a reset can rebuild the textures.
 
 Anything that can fail on bad input (a missing image, for instance) fails during
-parsing, before the window opens.
+parsing, before the window opens. The window is created hidden and shown only once the
+scene is on the GPU, so a failed upload (an image larger than the GPU's texture limit)
+doesn't flash it at the participant either. A sprite that fails to draw stops the run
+before its frame is presented and marked.
 
 ### Core data structures
 
@@ -367,8 +375,8 @@ bad config never flashes a window at the participant. `run()` then:
 
 `run()` is single-shot and must be called on the thread that constructed the
 `Runtime` (SDL handles window events only there); both are enforced with
-`std::logic_error`. The default render target opens the window on
-`display.index` and **refuses to run without vsync** — SDL silently drops
+`std::logic_error`. The default render target opens the window (hidden until the
+scene is uploaded) on `display.index` and **refuses to run without vsync** — SDL silently drops
 `PRESENTVSYNC` when the driver can't honour it, and marker timestamps are only
 correct when `SDL_RenderPresent` waits for the refresh.
 
@@ -400,8 +408,8 @@ Update the row in the same PR that changes it.
 
 | Component | What it does | Proto (`neuronide.proto`) | C++ (`scene/components/`) | Status | Tracking |
 | --- | --- | --- | --- | --- | --- |
-| Transform | Position, size, rotation. Exactly one per object. x/y is the top-left corner in window pixels, rotation is degrees clockwise about the centre. | `SceneObject.transform`, a field rather than a `Component` | `SceneObject::Transform` | **Partial**: parsed onto the object and drawn by SpriteRenderer, but not required (an object without one sits at all zeros; a sprite on it is rejected at parse time) | — |
-| SpriteRenderer | Draws an image: visual stimuli, photos, icons. | `SpriteRenderer` (`renderer = 1`), `img_path`; field 1 (`texture_path`) is reserved | `SpriteRenderer`, registered | **Implemented**: any SDL2_image format (PNG, JPEG, …), stretched over the Transform and rotated. Decoded at parse time, so a missing or unreadable file stops the run before the window opens; uploaded to the GPU before the first frame | [#17][rt-17], [backend#25][be-25] |
+| Transform | Position, size, rotation. Exactly one per object. x/y is the top-left corner in window pixels, rotation is degrees clockwise about the centre. | `SceneObject.transform`, a field rather than a `Component` | `SceneObject::Transform` | **Partial**: parsed onto the object and drawn by SpriteRenderer, but not required (an object without one sits at all zeros; a sprite with an image on it is rejected at parse time, as is a non-finite value) | — |
+| SpriteRenderer | Draws an image: visual stimuli, photos, icons. | `SpriteRenderer` (`renderer = 1`), `img_path`. The runtime does not read `texture_path` | `SpriteRenderer`, registered | **Implemented**: any SDL2_image format (PNG, JPEG, …), stretched over the Transform and rotated. Decoded at parse time, so a missing or unreadable file stops the run before the window opens; uploaded to the GPU before the first frame. Objects showing the same file share one decoded image. An empty `img_path` draws nothing | [#17][rt-17], [backend#25][be-25] |
 | TextRenderer | Draws text in a chosen font and size: instructions, letters, numbers. | `TextRenderer` (`text = 2`) | — | **Planned**: needs SDL2_ttf, which is not a dependency yet. The message has no text color | [#18][rt-18], [backend#25][be-25] |
 | BlinkComponent | Flickers the object at a set frequency in Hz. The basis for SSVEP. | `BlinkComponent` (`blinker = 3`) | `BlinkComponent`, registered and built by the parser | **In review**: `update()` is an empty TODO on `main`, so nothing blinks yet. PR [#34][rt-34] implements it; changes requested | [#16][rt-16] |
 | MarkerEmitter | Emits an LSL marker on a scene event, ideally when an object appears or disappears. | `MarkerEmitterComponent` (`marker_emitter = 5`). Missing from the backend's copy | `MarkerEmitterComponent`, registered | **Implemented, nothing to bind to**: bindings resolve and push markers (tested against a test-only event source), but no production component exposes an event and objects have no appear/disappear events, so any binding in a real `.neuroz` fails at parse time | [backend#23][be-23] |

@@ -39,8 +39,9 @@ class Runtime {
 
     // Parses and validates both input files and builds every worker before the
     // render target is created, so a bad configuration fails without opening a
-    // window. The constructing thread becomes the only thread allowed to call
-    // run().
+    // window. The render target's window, if it has one, is shown only after
+    // the scene has been uploaded to it. The constructing thread becomes the
+    // only thread allowed to call run().
     explicit Runtime(const RuntimePaths& paths);
     Runtime(const RuntimePaths& paths, const RenderTargetFactory& renderTargetFactory,
             std::chrono::milliseconds acquisitionTimeout = kDefaultAcquisitionTimeout);
@@ -77,10 +78,10 @@ class Runtime {
     // returned.
     const std::string& outputPath() const noexcept { return outputFilePath; }
 
-    // Opens a window on display.index (fullscreen or display.width x height)
-    // with an accelerated renderer, and throws std::runtime_error unless that
-    // renderer actually presents in sync with the display refresh. Marker
-    // timestamps are only correct when it does.
+    // Creates a hidden window on display.index (fullscreen or display.width x
+    // height) with an accelerated renderer, and throws std::runtime_error
+    // unless that renderer actually presents in sync with the display refresh.
+    // Marker timestamps are only correct when it does.
     static RenderTargetFactory defaultRenderTargetFactory();
 
    private:
@@ -106,11 +107,11 @@ class Runtime {
     std::thread::id           ownerThread;
     bool                      hasRun = false;
 
+    // Declared before every member holding SDL objects, so SDL_Quit runs only
+    // after they are gone. Textures need no ordering against sdlRenderer:
+    // each one keeps its SDL_Renderer alive (see Image).
     SdlSession sdlSession;
 
-    // Declared before `scene` on purpose: members are destroyed in reverse
-    // order, so the scene - and any SDL_Texture its components hold - is
-    // released while the SDL_Renderer that owns those textures is still alive.
     std::shared_ptr<SDL_Renderer> sdlRenderer;
 
     std::shared_ptr<Scene>                                scene;

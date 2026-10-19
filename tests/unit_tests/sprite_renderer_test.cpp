@@ -1,10 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
-#include <fstream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 
+#include "scene/Image.hpp"
 #include "scene/SceneObject.hpp"
 #include "scene/components/SpriteRenderer.hpp"
 #include "utils/SdlTestUtils.hpp"
@@ -17,6 +18,7 @@ constexpr double kSpriteY      = 20.0;
 constexpr double kSpriteWidth  = 20.0;
 constexpr double kSpriteHeight = 4.0;
 constexpr double kQuarterTurn  = 90.0;
+constexpr double kBeyondFloat  = 1e39;
 
 constexpr utils::Rgba kBackground{0, 0, 0, 255};
 constexpr utils::Rgba kLeft{255, 0, 0, 255};
@@ -37,8 +39,9 @@ constexpr int kOutside = 5;
 class SpriteRendererTest : public ::testing::Test {
    protected:
     void SetUp() override {
-        image = tempDir.path() / "sprite.png";
-        utils::writeTwoPixelPng(image, kLeft, kRight);
+        const auto path = tempDir.path() / "sprite.png";
+        utils::writeTwoPixelPng(path, kLeft, kRight);
+        loadedImage = std::make_shared<Image>(path);
 
         object = std::make_shared<SceneObject>("Stimulus");
         object->setTransform({kSpriteX, kSpriteY, kSpriteWidth, kSpriteHeight, 0.0});
@@ -47,27 +50,39 @@ class SpriteRendererTest : public ::testing::Test {
         utils::clear(renderTarget.get(), kBackground);
     }
 
-    const std::filesystem::path&         dir() const { return tempDir.path(); }
-    const std::filesystem::path&         imagePath() const { return image; }
+    const std::shared_ptr<Image>&        image() const { return loadedImage; }
     const std::shared_ptr<SceneObject>&  owner() const { return object; }
     const std::shared_ptr<SDL_Renderer>& target() const { return renderTarget; }
-    void                                 releaseTarget() { renderTarget.reset(); }
 
     utils::Rgba pixelAt(int column, int row) const {
         return utils::readPixel(renderTarget.get(), column, row);
     }
 
+    // Sets one transform field to `value` and reports whether a sprite on the owner is rejected.
+    bool rejectsTransformValue(double SceneObject::Transform::*field, double value) const {
+        const double original    = object->transform.*field;
+        object->transform.*field = value;
+        bool rejected            = false;
+        try {
+            const SpriteRenderer sprite(object, loadedImage);
+        } catch (const std::invalid_argument&) {
+            rejected = true;
+        }
+        object->transform.*field = original;
+        return rejected;
+    }
+
    private:
     utils::TempDir                tempDir;
-    std::filesystem::path         image;
+    std::shared_ptr<Image>        loadedImage;
     std::shared_ptr<SceneObject>  object;
     std::shared_ptr<SDL_Renderer> renderTarget;
 };
 }  // namespace
 
 TEST_F(SpriteRendererTest, StretchesImageOverTransform) {
-    SpriteRenderer sprite(owner(), imagePath());
-    sprite.onRenderTargetReady(target());
+    SpriteRenderer sprite(owner(), image());
+    image()->upload(target());
     sprite.render(target().get());
 
     EXPECT_EQ(pixelAt(kLeftHalfX, kRowY), kLeft);
@@ -79,8 +94,8 @@ TEST_F(SpriteRendererTest, StretchesImageOverTransform) {
 TEST_F(SpriteRendererTest, RotatesClockwiseAboutCentre) {
     owner()->transform.rotation = kQuarterTurn;
 
-    SpriteRenderer sprite(owner(), imagePath());
-    sprite.onRenderTargetReady(target());
+    SpriteRenderer sprite(owner(), image());
+    image()->upload(target());
     sprite.render(target().get());
 
     EXPECT_EQ(pixelAt(kColumnX, kTopY), kLeft);
@@ -88,61 +103,47 @@ TEST_F(SpriteRendererTest, RotatesClockwiseAboutCentre) {
     EXPECT_EQ(pixelAt(kLeftHalfX, kRowY), kBackground);
 }
 
-TEST_F(SpriteRendererTest, DrawsNothingBeforeRenderTargetIsReady) {
-    SpriteRenderer sprite(owner(), imagePath());
+TEST_F(SpriteRendererTest, DrawsNothingBeforeImageIsUploaded) {
+    SpriteRenderer sprite(owner(), image());
     sprite.render(target().get());
 
     EXPECT_EQ(pixelAt(kLeftHalfX, kRowY), kBackground);
 }
 
-TEST_F(SpriteRendererTest, ThrowsWhenImageIsMissing) {
-    EXPECT_THROW(SpriteRenderer(owner(), dir() / "missing.png"), std::runtime_error);
+TEST_F(SpriteRendererTest, WithoutImageDrawsNothingAndNeedsNoTransform) {
+    owner()->transform.width = 0.0;
+
+    SpriteRenderer sprite(owner(), nullptr);
+    sprite.render(target().get());
+
+    EXPECT_EQ(pixelAt(kLeftHalfX, kRowY), kBackground);
 }
 
-TEST_F(SpriteRendererTest, ThrowsWhenFileIsNotAnImage) {
-    const auto notAnImage = dir() / "notes.png";
-    std::ofstream(notAnImage) << "not an image";
+TEST_F(SpriteRendererTest, ThrowsWhenDrawingFails) {
+    SpriteRenderer sprite(owner(), image());
+    image()->upload(target());
 
-    EXPECT_THROW(SpriteRenderer(owner(), notAnImage), std::runtime_error);
-}
-
-TEST_F(SpriteRendererTest, ThrowsWhenImagePathIsEmpty) {
-    EXPECT_THROW(SpriteRenderer(owner(), std::filesystem::path{}), std::invalid_argument);
+    // SDL refuses to copy a texture onto a renderer it was not created on.
+    const auto otherTarget = utils::makeSoftwareTarget(kCanvasSize, kCanvasSize);
+    EXPECT_THROW(sprite.render(otherTarget.get()), std::runtime_error);
 }
 
 TEST_F(SpriteRendererTest, ThrowsWhenOwnerIsNull) {
-    EXPECT_THROW(SpriteRenderer(nullptr, imagePath()), std::invalid_argument);
-}
-
-TEST_F(SpriteRendererTest, ThrowsWhenRenderTargetIsNull) {
-    SpriteRenderer sprite(owner(), imagePath());
-
-    EXPECT_THROW(sprite.onRenderTargetReady(nullptr), std::invalid_argument);
+    EXPECT_THROW(SpriteRenderer(nullptr, image()), std::invalid_argument);
 }
 
 TEST_F(SpriteRendererTest, ThrowsWhenOwnerHasNoArea) {
     owner()->transform.width = 0.0;
 
-    EXPECT_THROW(SpriteRenderer(owner(), imagePath()), std::invalid_argument);
+    EXPECT_THROW(SpriteRenderer(owner(), image()), std::invalid_argument);
 }
 
-TEST_F(SpriteRendererTest, RejectsASecondRenderTarget) {
-    SpriteRenderer sprite(owner(), imagePath());
-    sprite.onRenderTargetReady(target());
-
-    EXPECT_THROW(sprite.onRenderTargetReady(target()), std::logic_error);
-}
-
-// SDL frees a renderer's textures along with it, so destroying the texture afterwards would be a
-// use-after-free. The texture therefore keeps its renderer alive.
-TEST_F(SpriteRendererTest, KeepsRenderTargetAliveWhileTextureExists) {
-    auto sprite = std::make_unique<SpriteRenderer>(owner(), imagePath());
-    sprite->onRenderTargetReady(target());
-
-    const std::weak_ptr<SDL_Renderer> weakTarget = target();
-    releaseTarget();
-    EXPECT_FALSE(weakTarget.expired());
-
-    sprite.reset();
-    EXPECT_TRUE(weakTarget.expired());
+TEST_F(SpriteRendererTest, ThrowsWhenTransformIsNotFinite) {
+    using Transform = SceneObject::Transform;
+    for (const auto field : {&Transform::posX, &Transform::posY, &Transform::width,
+                             &Transform::height, &Transform::rotation}) {
+        EXPECT_TRUE(rejectsTransformValue(field, std::numeric_limits<double>::infinity()));
+        EXPECT_TRUE(rejectsTransformValue(field, std::numeric_limits<double>::quiet_NaN()));
+        EXPECT_TRUE(rejectsTransformValue(field, kBeyondFloat));
+    }
 }

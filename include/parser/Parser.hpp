@@ -1,15 +1,15 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
 
-#include "scene/components/ComponentBuildContext.hpp"
-
 class Scene;
 class SceneObject;
 class Component;
+class ComponentBuildContext;
 
 namespace NeuronIDE {
 class SceneObject;
@@ -23,9 +23,9 @@ class Parser {
     // Relative asset paths in the scene (e.g. sprite images) resolve against the folder holding
     // filePath.
     static std::shared_ptr<Scene> parse(const std::string& filePath);
-    // Relative asset paths resolve against context.assetRoot: the working directory by default.
+    // Relative asset paths resolve against assetRoot: the working directory by default.
     static std::shared_ptr<Scene> parseStream(std::istream&                stream,
-                                              const ComponentBuildContext& context = {});
+                                              const std::filesystem::path& assetRoot = {});
 
    private:
     static std::shared_ptr<SceneObject> buildSceneObject(const NeuronIDE::SceneObject& protoObj,
