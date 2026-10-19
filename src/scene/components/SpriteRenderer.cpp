@@ -8,6 +8,7 @@
 #include <string>
 #include <utility>
 
+#include "Utf8Path.hpp"
 #include "neuronide.pb.h"
 #include "scene/Image.hpp"
 #include "scene/SceneObject.hpp"
@@ -64,8 +65,8 @@ void SpriteRenderer::render(SDL_Renderer* renderer) {
     // A null centre rotates about the centre of `destination`.
     if (SDL_RenderCopyExF(renderer, image->texture(), nullptr, &destination, transform.rotation,
                           nullptr, SDL_FLIP_NONE) != 0) {
-        throw std::runtime_error(describe(*ownerPtr) + ": cannot draw '" + image->path().string() +
-                                 "': " + SDL_GetError());
+        throw std::runtime_error(describe(*ownerPtr) + ": cannot draw '" +
+                                 utf8::toString(image->path()) + "': " + SDL_GetError());
     }
 }
 
@@ -73,8 +74,8 @@ std::unique_ptr<Component> SpriteRenderer::createSprite(const NeuronIDE::Compone
                                                         const std::shared_ptr<SceneObject>& owner,
                                                         const ComponentBuildContext& context) {
     const std::string& path = protoComp.renderer().img_path();
-    return std::make_unique<SpriteRenderer>(owner,
-                                            path.empty() ? nullptr : context.loadImage(path));
+    return std::make_unique<SpriteRenderer>(
+        owner, path.empty() ? nullptr : context.loadImage(utf8::toPath(path)));
 }
 
 REGISTER_COMPONENT(NeuronIDE::Component::kRenderer, SpriteRenderer::createSprite)
