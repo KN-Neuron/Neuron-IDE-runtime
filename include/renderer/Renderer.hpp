@@ -24,7 +24,13 @@ class Renderer {
 
     void render(const std::stop_token& stoken);
 
+    // Handles every pending window event and returns true when the operator asked to close the
+    // window. Call it whenever events are polled outside render(), so a device reset is not lost.
+    bool pollEvents();
+
    private:
+    void prepareScene();
+
     struct SDLWindowDeleter {
         void operator()(SDL_Window* window) const;
     };

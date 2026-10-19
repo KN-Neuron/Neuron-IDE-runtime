@@ -21,6 +21,8 @@
 
 #include "lsl_cpp.h"
 #include "utils/ParserTestUtils.hpp"
+#include "utils/SdlTestUtils.hpp"
+#include "utils/TempDir.hpp"
 
 // These tests drive a real LSLReader against a local LSL outlet over loopback,
 // like the LSLReader tests do.
@@ -29,7 +31,6 @@ namespace {
 namespace fs = std::filesystem;
 
 constexpr int    kSurfaceSize    = 10;
-constexpr int    kSurfaceDepth   = 32;
 constexpr int    kStreamChannels = 1;
 constexpr int    kWrongChannels  = 2;
 constexpr double kSampleRateHz   = 250.0;
@@ -79,17 +80,7 @@ std::string makeConfigJson(const std::string& streamName, const ConfigOptions& o
 }
 
 std::shared_ptr<SDL_Renderer> createSoftwareRenderer() {
-    SDL_Surface*  surface  = SDL_CreateRGBSurfaceWithFormat(0, kSurfaceSize, kSurfaceSize,
-                                                            kSurfaceDepth, SDL_PIXELFORMAT_RGBA32);
-    SDL_Renderer* renderer = SDL_CreateSoftwareRenderer(surface);
-    return {renderer, [surface](SDL_Renderer* target) {
-                if (target != nullptr) {
-                    SDL_DestroyRenderer(target);
-                }
-                if (surface != nullptr) {
-                    SDL_FreeSurface(surface);
-                }
-            }};
+    return utils::makeSoftwareTarget(kSurfaceSize, kSurfaceSize);
 }
 
 // A software renderer backed by an in-memory surface: no window, GPU, or
@@ -213,28 +204,18 @@ class RuntimeFixture : public ::testing::Test {
         // succeed without a display. The software renderer is unaffected by it.
         setenv("SDL_VIDEODRIVER", "dummy", 1);
 
-        tempDir = fs::temp_directory_path() /
-                  ("neuronide_runtime_" +
-                   std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-        fs::create_directories(tempDir);
-
         streamName = currentStreamName();
-        writeText(tempDir / "config.json", makeConfigJson(streamName));
-        writeExperimentFile(tempDir / "experiment.pb", utils::buildSimpleScene());
+        writeText(dir() / "config.json", makeConfigJson(streamName));
+        writeExperimentFile(dir() / "experiment.pb", utils::buildSimpleScene());
     }
 
-    void TearDown() override {
-        std::error_code errorCode;
-        fs::remove_all(tempDir, errorCode);
-    }
-
-    const fs::path&    dir() const { return tempDir; }
+    const fs::path&    dir() const { return tempDir.path(); }
     const std::string& stream() const { return streamName; }
 
     RuntimePaths paths() const {
-        return RuntimePaths{.config     = (tempDir / "config.json").string(),
-                            .experiment = (tempDir / "experiment.pb").string(),
-                            .outputDir  = tempDir.string()};
+        return RuntimePaths{.config     = (dir() / "config.json").string(),
+                            .experiment = (dir() / "experiment.pb").string(),
+                            .outputDir  = dir().string()};
     }
 
     std::unique_ptr<Runtime> makeRuntime(
@@ -257,8 +238,8 @@ class RuntimeFixture : public ::testing::Test {
     }
 
    private:
-    fs::path    tempDir;
-    std::string streamName;
+    utils::TempDir tempDir;
+    std::string    streamName;
 };
 }  // namespace
 
@@ -339,6 +320,30 @@ TEST_F(RuntimeFixture, PassesTheConfiguredDisplayToTheRenderTargetFactory) {
 
     constexpr int kConfiguredWidth = 800;
     EXPECT_EQ(received.width, kConfiguredWidth);
+}
+
+TEST_F(RuntimeFixture, ShowsTheRenderTargetsWindowOnceConstructed) {
+    SDL_Window* window  = nullptr;
+    const auto  factory = [&window](const std::string&,
+                                   const DisplayConfig&) -> std::shared_ptr<SDL_Renderer> {
+        window = SDL_CreateWindow("test", 0, 0, kSurfaceSize, kSurfaceSize, SDL_WINDOW_HIDDEN);
+        if (window == nullptr) {
+            throw utils::sdlFailure("SDL_CreateWindow");
+        }
+        SDL_Renderer* target = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+        if (target == nullptr) {
+            throw utils::sdlFailure("SDL_CreateRenderer");
+        }
+        return {target, [created = window](SDL_Renderer* renderer) {
+                    SDL_DestroyRenderer(renderer);
+                    SDL_DestroyWindow(created);
+                }};
+    };
+
+    const Runtime runtime(paths(), factory);
+
+    ASSERT_NE(window, nullptr);
+    EXPECT_NE(SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN, 0U);
 }
 
 // --- Acquisition gate ------------------------------------------------------

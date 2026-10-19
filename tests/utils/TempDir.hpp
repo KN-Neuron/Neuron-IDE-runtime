@@ -3,6 +3,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <string>
@@ -15,9 +17,17 @@ namespace utils {
 class TempDir {
    public:
     TempDir() {
-        const auto*       info = ::testing::UnitTest::GetInstance()->current_test_info();
-        const std::string testName =
+        const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
+        std::string testName =
             info != nullptr ? std::string(info->test_suite_name()) + "_" + info->name() : "none";
+        // Parameterised and typed tests have '/' in their names, which would nest directories
+        // that remove_all(root) leaves behind.
+        std::replace_if(
+            testName.begin(), testName.end(),
+            [](unsigned char character) {
+                return std::isalnum(character) == 0 && character != '-' && character != '_';
+            },
+            '_');
         root = std::filesystem::temp_directory_path() /
                ("neuronide_" + testName + "_" +
                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));

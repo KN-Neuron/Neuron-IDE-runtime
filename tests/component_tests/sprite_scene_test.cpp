@@ -22,18 +22,21 @@ constexpr double      kSpriteSize = 10.0;
 constexpr utils::Rgba kLeft{255, 0, 0, 255};
 constexpr utils::Rgba kRight{0, 0, 255, 255};
 
-NeuronIDE::Scene sceneWithSprite(const std::string& imagePath, bool withTransform = true) {
-    NeuronIDE::Scene scene;
-    scene.set_project_name("Sprites");
-
+void addSprite(NeuronIDE::Scene& scene, const std::string& imagePath, bool withTransform = true) {
     auto* object = scene.add_scene_objects();
-    object->set_name("Stimulus");
+    object->set_name("Stimulus" + std::to_string(scene.scene_objects_size()));
     object->set_is_visible(true);
     if (withTransform) {
         object->mutable_transform()->set_width(kSpriteSize);
         object->mutable_transform()->set_height(kSpriteSize);
     }
     object->add_components()->mutable_renderer()->set_img_path(imagePath);
+}
+
+NeuronIDE::Scene sceneWithSprite(const std::string& imagePath, bool withTransform = true) {
+    NeuronIDE::Scene scene;
+    scene.set_project_name("Sprites");
+    addSprite(scene, imagePath, withTransform);
     return scene;
 }
 
@@ -95,10 +98,24 @@ TEST_F(SpriteSceneTest, MissingImageFailsTheParseAndNamesTheFile) {
     }
 }
 
-TEST_F(SpriteSceneTest, EmptyImagePathFailsTheParse) {
-    writeExperiment(sceneWithSprite(""));
+// Only an image that is named but cannot be loaded is an error.
+TEST_F(SpriteSceneTest, EmptyImagePathGivesASpriteWithoutImage) {
+    writeExperiment(sceneWithSprite("", /*withTransform=*/false));
 
-    EXPECT_THROW(parseExperiment(), std::invalid_argument);
+    const auto scene = parseExperiment();
+    EXPECT_TRUE(hasSprite(*scene));
+    EXPECT_EQ(scene->images().size(), 0U);
+}
+
+TEST_F(SpriteSceneTest, ObjectsShowingTheSameFileShareOneImage) {
+    utils::writeTwoPixelPng(dir() / "face.png", kLeft, kRight);
+    NeuronIDE::Scene proto;
+    proto.set_project_name("Sprites");
+    addSprite(proto, "face.png");
+    addSprite(proto, "./face.png");
+    writeExperiment(proto);
+
+    EXPECT_EQ(parseExperiment()->images().size(), 1U);
 }
 
 TEST_F(SpriteSceneTest, SpriteOnObjectWithoutTransformFailsTheParse) {
