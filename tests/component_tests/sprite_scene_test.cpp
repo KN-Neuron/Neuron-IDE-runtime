@@ -118,6 +118,18 @@ TEST_F(SpriteSceneTest, ObjectsShowingTheSameFileShareOneImage) {
     EXPECT_EQ(parseExperiment()->images().size(), 1U);
 }
 
+// Proto strings are UTF-8, and stimulus names need not be ASCII.
+TEST_F(SpriteSceneTest, LoadsImageWithNonAsciiPath) {
+    const std::u8string imagePath = u8"bodźce/twarz_ż.png";
+    fs::create_directories(dir() / fs::path(u8"bodźce"));
+    utils::writeTwoPixelPng(dir() / fs::path(imagePath), kLeft, kRight);
+    writeExperiment(sceneWithSprite(std::string(imagePath.begin(), imagePath.end())));
+
+    const auto scene = parseExperiment();
+    EXPECT_TRUE(hasSprite(*scene));
+    EXPECT_EQ(scene->images().size(), 1U);
+}
+
 TEST_F(SpriteSceneTest, SpriteOnObjectWithoutTransformFailsTheParse) {
     utils::writeTwoPixelPng(dir() / "face.png", kLeft, kRight);
     writeExperiment(sceneWithSprite("face.png", /*withTransform=*/false));

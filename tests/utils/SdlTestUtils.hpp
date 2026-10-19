@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "Utf8Path.hpp"
+
 namespace utils {
 
 // One pixel as {r, g, b, a}; ints rather than Uint8 so gtest prints them as numbers.
@@ -75,8 +77,8 @@ inline void writeTwoPixelPng(const std::filesystem::path& path, const Rgba& left
     fill(0, left);
     fill(1, right);
 
-    if (IMG_SavePNG(surface.get(), path.string().c_str()) != 0) {
-        throw sdlFailure("IMG_SavePNG " + path.string());
+    if (IMG_SavePNG(surface.get(), utf8::toString(path).c_str()) != 0) {
+        throw sdlFailure("IMG_SavePNG " + utf8::toString(path));
     }
 }
 
