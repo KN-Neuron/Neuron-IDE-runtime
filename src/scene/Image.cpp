@@ -23,6 +23,8 @@ Image::Image(std::filesystem::path path) : filePath(std::move(path)) {
         throw std::runtime_error("cannot load image '" + utf8::toString(filePath) +
                                  "': " + IMG_GetError());
     }
+    // TODO(quill): debug, the path and decoded size (pixels->w x pixels->h). The pixels stay in
+    // memory for the whole run, so large images are worth seeing.
 }
 
 void Image::upload(const std::shared_ptr<SDL_Renderer>& target) {
