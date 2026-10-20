@@ -17,3 +17,5 @@ target_link_libraries(scene PUBLIC
     ${SDL2_LIBRARIES}
     SDL2_image::SDL2_image
 )
+
+target_link_libraries(scene PRIVATE logging)

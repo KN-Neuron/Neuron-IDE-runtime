@@ -29,7 +29,7 @@ constexpr auto kBackendSleep = std::chrono::milliseconds(5);
 
 // logger() indexes its cache by enumerator value: list every one, in order.
 constexpr std::array kSubsystems{Subsystem::App, Subsystem::Runtime, Subsystem::LslReader,
-                                 Subsystem::Scene};
+                                 Subsystem::Renderer, Subsystem::Scene};
 
 const char* nameOf(Subsystem subsystem) {
     switch (subsystem) {
@@ -39,6 +39,8 @@ const char* nameOf(Subsystem subsystem) {
             return "runtime";
         case Subsystem::LslReader:
             return "lslreader";
+        case Subsystem::Renderer:
+            return "renderer";
         case Subsystem::Scene:
             return "scene";
     }

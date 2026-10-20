@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <limits>
+#include <logging/Logging.hpp>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -16,6 +17,8 @@
 #include "scene/components/ComponentRegistry.hpp"
 
 namespace {
+quill::Logger* logger() { return logging::logger(logging::Subsystem::Scene); }
+
 // SDL draws in float, and converting a double outside float range is undefined. Also false for
 // NaN and infinity.
 bool fitsInFloat(double value) {
@@ -32,7 +35,7 @@ SpriteRenderer::SpriteRenderer(const std::shared_ptr<SceneObject>& owner,
         throw std::invalid_argument("SpriteRenderer: owner must not be null");
     }
     if (!this->image) {
-        // TODO(quill): warning, "SpriteRenderer on '<name>' has no image and draws nothing".
+        LOG_WARNING(logger(), "{} has no image and draws nothing", describe(*owner));
         return;
     }
 
@@ -48,16 +51,26 @@ SpriteRenderer::SpriteRenderer(const std::shared_ptr<SceneObject>& owner,
         throw std::invalid_argument(describe(*owner) +
                                     ": the object needs a positive width and height");
     }
-    // TODO(quill): debug, the image path and the transform it is drawn into.
+    LOG_DEBUG(logger(), "{} draws '{}' at ({}, {}), {}x{}, rotated {} deg", describe(*owner),
+              utf8::toString(this->image->path()), transform.posX, transform.posY, transform.width,
+              transform.height, transform.rotation);
 }
 
 void SpriteRenderer::update(const Context& context) { (void)context; }
 
 void SpriteRenderer::render(SDL_Renderer* renderer) {
     const auto ownerPtr = owner.lock();
-    if (renderer == nullptr || !image || image->texture() == nullptr || !ownerPtr) {
-        // TODO(quill): warning when there is an image but no texture, or the owner is gone: the
-        // stimulus is missing from the screen. Once per sprite, not every frame.
+    if (renderer == nullptr || !image) {
+        return;
+    }
+    if (image->texture() == nullptr || !ownerPtr) {
+        // render() runs every frame, so this is reported once per sprite.
+        if (!missingStimulusReported) {
+            missingStimulusReported = true;
+            LOG_WARNING(logger(), "Stimulus '{}' is missing from the screen: {}",
+                        utf8::toString(image->path()),
+                        ownerPtr ? describe(*ownerPtr) + " has no texture" : "its object is gone");
+        }
         return;
     }
 
@@ -77,11 +90,19 @@ void SpriteRenderer::render(SDL_Renderer* renderer) {
 std::unique_ptr<Component> SpriteRenderer::createSprite(const NeuronIDE::Component& protoComp,
                                                         const std::shared_ptr<SceneObject>& owner,
                                                         const ComponentBuildContext& context) {
-    const std::string& path = protoComp.renderer().img_path();
-    // TODO(quill): warning when img_path is empty but texture_path is set: the exporter filled the
-    // field the runtime does not read.
-    return std::make_unique<SpriteRenderer>(
+    const auto&        proto  = protoComp.renderer();
+    const std::string& path   = proto.img_path();
+    auto               sprite = std::make_unique<SpriteRenderer>(
         owner, path.empty() ? nullptr : context.loadImage(utf8::toPath(path)));
+
+    // After construction, which rejects a null owner.
+    if (path.empty() && !proto.texture_path().empty()) {
+        LOG_WARNING(logger(),
+                    "{}: texture_path is '{}' but img_path is empty; the runtime reads img_path "
+                    "only, so the exporter filled the wrong field",
+                    describe(*owner), proto.texture_path());
+    }
+    return sprite;
 }
 
 REGISTER_COMPONENT(NeuronIDE::Component::kRenderer, SpriteRenderer::createSprite)

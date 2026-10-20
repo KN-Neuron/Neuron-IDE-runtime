@@ -13,3 +13,5 @@ target_link_libraries(renderer PUBLIC
     concurrentqueue 
     ${SDL2_LIBRARIES}
 )
+
+target_link_libraries(renderer PRIVATE logging)

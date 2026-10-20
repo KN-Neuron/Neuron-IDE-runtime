@@ -10,7 +10,7 @@
 
 namespace logging {
 
-enum class Subsystem : std::uint8_t { App, Runtime, LslReader, Scene };
+enum class Subsystem : std::uint8_t { App, Runtime, LslReader, Renderer, Scene };
 
 // Safe to call from any thread. Messages reach stderr only while a Session is
 // running; without one they are queued and never printed.
