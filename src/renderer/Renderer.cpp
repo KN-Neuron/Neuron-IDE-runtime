@@ -36,6 +36,8 @@ bool Renderer::pollEvents() {
             quit = true;
         } else if (event.type == SDL_RENDER_DEVICE_RESET) {
             // Every texture is gone (e.g. Direct3D after a lock screen or UAC prompt).
+            // TODO(quill): warning with lsl::local_clock(): frames around a reset may be dropped,
+            // and whoever analyses the recording needs to know when.
             prepareScene();
         }
     }

@@ -32,6 +32,7 @@ SpriteRenderer::SpriteRenderer(const std::shared_ptr<SceneObject>& owner,
         throw std::invalid_argument("SpriteRenderer: owner must not be null");
     }
     if (!this->image) {
+        // TODO(quill): warning, "SpriteRenderer on '<name>' has no image and draws nothing".
         return;
     }
 
@@ -47,6 +48,7 @@ SpriteRenderer::SpriteRenderer(const std::shared_ptr<SceneObject>& owner,
         throw std::invalid_argument(describe(*owner) +
                                     ": the object needs a positive width and height");
     }
+    // TODO(quill): debug, the image path and the transform it is drawn into.
 }
 
 void SpriteRenderer::update(const Context& context) { (void)context; }
@@ -54,6 +56,8 @@ void SpriteRenderer::update(const Context& context) { (void)context; }
 void SpriteRenderer::render(SDL_Renderer* renderer) {
     const auto ownerPtr = owner.lock();
     if (renderer == nullptr || !image || image->texture() == nullptr || !ownerPtr) {
+        // TODO(quill): warning when there is an image but no texture, or the owner is gone: the
+        // stimulus is missing from the screen. Once per sprite, not every frame.
         return;
     }
 
@@ -74,6 +78,8 @@ std::unique_ptr<Component> SpriteRenderer::createSprite(const NeuronIDE::Compone
                                                         const std::shared_ptr<SceneObject>& owner,
                                                         const ComponentBuildContext& context) {
     const std::string& path = protoComp.renderer().img_path();
+    // TODO(quill): warning when img_path is empty but texture_path is set: the exporter filled the
+    // field the runtime does not read.
     return std::make_unique<SpriteRenderer>(
         owner, path.empty() ? nullptr : context.loadImage(utf8::toPath(path)));
 }
