@@ -3,11 +3,16 @@
 #include <SDL2/SDL.h>
 #include <SDL_image.h>
 
+#include <logging/Logging.hpp>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
 #include "Utf8Path.hpp"
+
+namespace {
+quill::Logger* logger() { return logging::logger(logging::Subsystem::Scene); }
+}  // namespace
 
 void Image::SurfaceDeleter::operator()(SDL_Surface* surface) const noexcept {
     SDL_FreeSurface(surface);
@@ -23,8 +28,8 @@ Image::Image(std::filesystem::path path) : filePath(std::move(path)) {
         throw std::runtime_error("cannot load image '" + utf8::toString(filePath) +
                                  "': " + IMG_GetError());
     }
-    // TODO(quill): debug, the path and decoded size (pixels->w x pixels->h). The pixels stay in
-    // memory for the whole run, so large images are worth seeing.
+    // The pixels stay in memory for the whole run, so large images are worth seeing.
+    LOG_DEBUG(logger(), "Decoded '{}' ({}x{} px)", utf8::toString(filePath), pixels->w, pixels->h);
 }
 
 void Image::upload(const std::shared_ptr<SDL_Renderer>& target) {

@@ -1,9 +1,15 @@
 #include "renderer/Renderer.hpp"
 
+#include <logging/Logging.hpp>
+
 #include "data_structures/Context.hpp"
 #include "data_structures/Marker.hpp"
 #include "lsl_cpp.h"
 #include "scene/Scene.hpp"
+
+namespace {
+quill::Logger* logger() { return logging::logger(logging::Subsystem::Renderer); }
+}  // namespace
 
 void Renderer::SDLWindowDeleter::operator()(SDL_Window* window) const {
     if (window != nullptr) {
@@ -35,9 +41,12 @@ bool Renderer::pollEvents() {
         if (event.type == SDL_QUIT) {
             quit = true;
         } else if (event.type == SDL_RENDER_DEVICE_RESET) {
-            // Every texture is gone (e.g. Direct3D after a lock screen or UAC prompt).
-            // TODO(quill): warning with lsl::local_clock(): frames around a reset may be dropped,
-            // and whoever analyses the recording needs to know when.
+            // Every texture is gone (e.g. Direct3D after a lock screen or UAC prompt). Frames
+            // around a reset may be dropped, so the log gives analysis the time on the LSL clock.
+            LOG_WARNING(logger(),
+                        "Render device reset at LSL time {:.6f} s; frames around it may be "
+                        "missing. Uploading the scene again",
+                        lsl::local_clock());
             prepareScene();
         }
     }

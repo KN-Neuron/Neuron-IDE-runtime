@@ -36,6 +36,7 @@ class SpriteRenderer : public Component {
 
    private:
     std::shared_ptr<const Image> image;
+    bool                         missingStimulusReported = false;
 };
 
 #endif  // SPRITERENDERER_HPP
