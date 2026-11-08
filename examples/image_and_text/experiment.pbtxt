@@ -1,0 +1,39 @@
+# Objects are drawn in this order, so later ones end up on top.
+project_name: "image_and_text"
+
+scene_objects {
+  name: "Title"
+  is_visible: true
+  transform { x: 140 y: 30 width: 1000 height: 90 }
+  components { text { text: "Przykład: obraz i tekst" font_size: 56 } }
+}
+
+scene_objects {
+  name: "Checkerboard"
+  is_visible: true
+  transform { x: 440 y: 135 width: 400 height: 400 }
+  components { renderer { img_path: "stimulus.png" } }
+}
+
+scene_objects {
+  name: "Instructions"
+  is_visible: true
+  transform { x: 190 y: 560 width: 900 height: 120 }
+  components {
+    text { text: "Patrz na czerwony punkt w środku.\nZamknij okno, aby zakończyć." font_size: 34 }
+  }
+}
+
+scene_objects {
+  name: "RotatedLabel"
+  is_visible: true
+  transform { x: 30 y: 300 width: 380 height: 80 rotation: -20 }
+  components { text { text: "obrót o -20°" font_size: 44 } }
+}
+
+scene_objects {
+  name: "SmallLabel"
+  is_visible: true
+  transform { x: 900 y: 320 width: 340 height: 60 }
+  components { text { text: "font_size 12: tyle dziś eksportuje edytor" font_size: 12 } }
+}
