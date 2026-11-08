@@ -59,7 +59,7 @@ class SpriteRendererTest : public ::testing::Test {
     }
 
     // Sets one transform field to `value` and reports whether a sprite on the owner is rejected.
-    bool rejectsTransformValue(double SceneObject::Transform::*field, double value) const {
+    bool rejectsTransformValue(double SceneObject::Transform::* field, double value) const {
         const double original    = object->transform.*field;
         object->transform.*field = value;
         bool rejected            = false;

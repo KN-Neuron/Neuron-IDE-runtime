@@ -531,7 +531,7 @@ All commands are run from the `Neuron-IDE-runtime/` directory.
 
 ```bash
 sudo apt update
-sudo apt install cmake ninja-build clang-format clang-tidy-20 libsdl2-dev libsdl2-image-dev protobuf-compiler gcovr
+sudo apt install cmake ninja-build clang-format-20 clang-tidy-20 libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev protobuf-compiler gcovr
 # GTest, LSL, concurrentqueue, nlohmann/json and Quill are fetched automatically by CMake.
 ```
 

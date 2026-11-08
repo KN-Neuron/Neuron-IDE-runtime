@@ -16,8 +16,9 @@ if(NEURON_IDE_ENABLE_CLANG_TIDY)
 endif()
 
 # --- Clang-Format Target ---
-find_program(CLANG_FORMAT_EXE NAMES "clang-format")
-if(CLANG_FORMAT_EXE)
+# The same version as CI, because the formatting clang-format asks for changes between releases.
+find_program(CLANG_FORMAT_20_EXE NAMES "clang-format-20")
+if(CLANG_FORMAT_20_EXE)
     file(GLOB_RECURSE ALL_CXX_SOURCE_FILES
         "src/*.cpp" "src/*.hpp"
         "include/*.hpp"
@@ -25,9 +26,9 @@ if(CLANG_FORMAT_EXE)
     )
     add_custom_target(
         format
-        COMMAND ${CLANG_FORMAT_EXE} -i -style=file ${ALL_CXX_SOURCE_FILES}
+        COMMAND ${CLANG_FORMAT_20_EXE} -i -style=file ${ALL_CXX_SOURCE_FILES}
         COMMENT "Formatting source code with clang-format"
     )
 else()
-    message(WARNING "clang-format not found.")
+    message(WARNING "clang-format-20 not found, so there is no format target.")
 endif()
