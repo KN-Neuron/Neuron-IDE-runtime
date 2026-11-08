@@ -15,6 +15,7 @@
 
 namespace {
 constexpr double      kBlinkFrequencyHz = 10.0;
+constexpr unsigned    kFontSize         = 12;
 constexpr utils::Rgba kWhite{255, 255, 255, 255};
 
 NeuronIDE::Component* addObjectWithComponent(NeuronIDE::Scene& scene, const std::string& name) {
@@ -39,6 +40,7 @@ TEST(ComponentRegistrationTest, EveryImplementedComponentIsLinkedIn) {
         ->set_blink_frequency_hz(kBlinkFrequencyHz);
     addObjectWithComponent(proto, "MarkerEmitter")->mutable_marker_emitter();
     addObjectWithComponent(proto, "Sprite")->mutable_renderer()->set_img_path("sprite.png");
+    addObjectWithComponent(proto, "Text")->mutable_text()->set_font_size(kFontSize);
 
     std::stringstream stream;
     ASSERT_TRUE(proto.SerializeToOstream(&stream));

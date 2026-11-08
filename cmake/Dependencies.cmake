@@ -60,9 +60,11 @@ FetchContent_MakeAvailable(googletest liblsl concurrentqueue nlohmann_json quill
 set(CMAKE_C_FLAGS "${BACKUP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${BACKUP_CXX_FLAGS}")
 
-# 6. SDL2 + SDL2_image (System installed)
+# 6. SDL2 + SDL2_image + SDL2_ttf (System installed)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
+# 2.20 is the first with TTF_SetFontWrappedAlign.
+find_package(SDL2_ttf 2.20 REQUIRED)
 
 # 7. Protobuf (System installed)
 find_package(Protobuf REQUIRED)

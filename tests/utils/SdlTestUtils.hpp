@@ -6,11 +6,13 @@
 
 #include <array>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <stdexcept>
 #include <string>
 
 #include "Utf8Path.hpp"
+#include "scene/DefaultFont.hpp"
 
 namespace utils {
 
@@ -79,6 +81,18 @@ inline void writeTwoPixelPng(const std::filesystem::path& path, const Rgba& left
 
     if (IMG_SavePNG(surface.get(), utf8::toString(path).c_str()) != 0) {
         throw sdlFailure("IMG_SavePNG " + utf8::toString(path));
+    }
+}
+
+// A valid TrueType file on disk, whatever fonts the machine has installed.
+inline void writeFontFile(const std::filesystem::path& path) {
+    const auto    bytes = defaultFontBytes();
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    for (const unsigned char byte : bytes) {
+        out.put(static_cast<char>(byte));
+    }
+    if (!out) {
+        throw std::runtime_error("cannot write " + utf8::toString(path));
     }
 }
 

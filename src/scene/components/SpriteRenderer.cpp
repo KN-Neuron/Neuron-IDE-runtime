@@ -2,8 +2,6 @@
 
 #include <SDL2/SDL.h>
 
-#include <cmath>
-#include <limits>
 #include <logging/Logging.hpp>
 #include <stdexcept>
 #include <string>
@@ -18,12 +16,6 @@
 
 namespace {
 quill::Logger* logger() { return logging::logger(logging::Subsystem::Scene); }
-
-// SDL draws in float, and converting a double outside float range is undefined. Also false for
-// NaN and infinity.
-bool fitsInFloat(double value) {
-    return std::abs(value) <= static_cast<double>(std::numeric_limits<float>::max());
-}
 
 std::string describe(const SceneObject& owner) { return "SpriteRenderer on '" + owner.name + "'"; }
 }  // namespace
@@ -40,17 +32,7 @@ SpriteRenderer::SpriteRenderer(const std::shared_ptr<SceneObject>& owner,
     }
 
     const auto& transform = owner->transform;
-    for (const double value :
-         {transform.posX, transform.posY, transform.width, transform.height, transform.rotation}) {
-        if (!fitsInFloat(value)) {
-            throw std::invalid_argument(describe(*owner) +
-                                        ": the transform has a non-finite or out-of-range value");
-        }
-    }
-    if (transform.width <= 0.0 || transform.height <= 0.0) {
-        throw std::invalid_argument(describe(*owner) +
-                                    ": the object needs a positive width and height");
-    }
+    transform.requireDrawable(describe(*owner));
     LOG_DEBUG(logger(), "{} draws '{}' at ({}, {}), {}x{}, rotated {} deg", describe(*owner),
               utf8::toString(this->image->path()), transform.posX, transform.posY, transform.width,
               transform.height, transform.rotation);

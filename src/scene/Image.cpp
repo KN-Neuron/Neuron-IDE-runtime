@@ -12,35 +12,23 @@
 
 namespace {
 quill::Logger* logger() { return logging::logger(logging::Subsystem::Scene); }
-}  // namespace
 
-void Image::SurfaceDeleter::operator()(SDL_Surface* surface) const noexcept {
-    SDL_FreeSurface(surface);
-}
-
-void Image::TextureDeleter::operator()(SDL_Texture* texture) const noexcept {
-    SDL_DestroyTexture(texture);
-}
-
-Image::Image(std::filesystem::path path) : filePath(std::move(path)) {
-    pixels.reset(IMG_Load(utf8::toString(filePath).c_str()));
-    if (!pixels) {
-        throw std::runtime_error("cannot load image '" + utf8::toString(filePath) +
+SDL_Surface* decode(const std::filesystem::path& path) {
+    SDL_Surface* pixels = IMG_Load(utf8::toString(path).c_str());
+    if (pixels == nullptr) {
+        throw std::runtime_error("cannot load image '" + utf8::toString(path) +
                                  "': " + IMG_GetError());
     }
-    // The pixels stay in memory for the whole run, so large images are worth seeing.
-    LOG_DEBUG(logger(), "Decoded '{}' ({}x{} px)", utf8::toString(filePath), pixels->w, pixels->h);
+    return pixels;
+}
+}  // namespace
+
+Image::Image(std::filesystem::path path)
+    : filePath(std::move(path)), bitmap(decode(filePath), "'" + utf8::toString(filePath) + "'") {
+    LOG_DEBUG(logger(), "Decoded '{}' ({}x{} px)", utf8::toString(filePath), bitmap.width(),
+              bitmap.height());
 }
 
-void Image::upload(const std::shared_ptr<SDL_Renderer>& target) {
-    if (!target) {
-        throw std::invalid_argument("Image: render target must not be null");
-    }
+void Image::upload(const std::shared_ptr<SDL_Renderer>& target) { bitmap.upload(target); }
 
-    SDL_Texture* created = SDL_CreateTextureFromSurface(target.get(), pixels.get());
-    if (created == nullptr) {
-        throw std::runtime_error("cannot create a texture from '" + utf8::toString(filePath) +
-                                 "': " + SDL_GetError());
-    }
-    gpuTexture = std::unique_ptr<SDL_Texture, TextureDeleter>(created, TextureDeleter{target});
-}
+SDL_Texture* Image::texture() const noexcept { return bitmap.texture(); }
