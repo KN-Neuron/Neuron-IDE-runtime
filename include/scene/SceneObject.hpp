@@ -16,6 +16,10 @@ class SceneObject {
 
     struct Transform {
         double posX = 0, posY = 0, width = 0, height = 0, rotation = 0;
+
+        // Throws std::invalid_argument, naming `who`, unless every value can be drawn with and the
+        // width and height are positive.
+        void requireDrawable(const std::string& who) const;
     } transform;
 
     std::vector<std::unique_ptr<Component>> components;
