@@ -1,14 +1,14 @@
 #ifndef FONT_HPP
 #define FONT_HPP
 
+#include <SDL_ttf.h>
+
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <string_view>
 
 #include "scene/Bitmap.hpp"
-
-struct _TTF_Font;  // NOLINT(bugprone-reserved-identifier): SDL_ttf's own name for TTF_Font
 
 // A TrueType font opened at one size, which turns text into pixels.
 class Font {
@@ -36,12 +36,12 @@ class Font {
         Session& operator=(Session&&)      = delete;
     };
     struct FontCloser {
-        void operator()(_TTF_Font* font) const noexcept;
+        void operator()(TTF_Font* font) const noexcept;
     };
 
     // In this order: the font must be closed while the session is still open.
-    Session                                session;
-    std::unique_ptr<_TTF_Font, FontCloser> handle;
+    Session                               session;
+    std::unique_ptr<TTF_Font, FontCloser> handle;
 };
 
 #endif  // FONT_HPP
