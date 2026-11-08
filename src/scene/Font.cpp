@@ -1,7 +1,6 @@
 #include "scene/Font.hpp"
 
 #include <SDL2/SDL.h>
-#include <SDL_ttf.h>
 
 #include <algorithm>
 #include <sstream>
@@ -38,7 +37,7 @@ Font::Session::Session() {
 
 Font::Session::~Session() { TTF_Quit(); }
 
-void Font::FontCloser::operator()(_TTF_Font* font) const noexcept { TTF_CloseFont(font); }
+void Font::FontCloser::operator()(TTF_Font* font) const noexcept { TTF_CloseFont(font); }
 
 Font::Font(const std::filesystem::path& path, int pixelSize) {
     if (path.empty()) {
