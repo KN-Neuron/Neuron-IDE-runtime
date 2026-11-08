@@ -20,11 +20,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y $BUILD_DEPS clang-format gcovr
+        sudo apt-get install -y $BUILD_DEPS clang-format-20 gcovr
 
     - name: Check Code Formatting
       run: |
-        find src include tests -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" -o -name "*.h" \) | xargs clang-format --dry-run -Werror
+        find src include tests -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" -o -name "*.h" \) | xargs clang-format-20 --dry-run -Werror
 
     - name: Configure CMake
       run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEURON_IDE_ENABLE_COVERAGE=ON -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF
