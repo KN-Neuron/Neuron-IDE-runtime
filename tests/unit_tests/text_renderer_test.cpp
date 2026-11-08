@@ -135,7 +135,7 @@ class TextRendererTest : public ::testing::Test {
 
     Extent drawnExtent(std::string_view content) const { return extentOf(drawn(content)); }
 
-    void expectRejected(double SceneObject::Transform::*field, double value) const {
+    void expectRejected(double SceneObject::Transform::* field, double value) const {
         const double original    = object->transform.*field;
         object->transform.*field = value;
         EXPECT_THROW(TextRenderer(object, kBlock, "", kFontSize), std::invalid_argument);
