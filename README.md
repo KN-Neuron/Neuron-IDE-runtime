@@ -498,7 +498,7 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
   ├── README.md             # this file, code context
   ├── CMakeLists.txt        # top-level: deps, warnings, static analysis, coverage
   ├── cmake/                # Dependencies / CompilerWarnings / StaticAnalysis / Coverage
-  ├── ci/Dockerfile         # the image every CI job runs in (§9 "Running CI's image locally")
+  ├── ci/                   # Dockerfile (CI's image), checks.sh (CI's checks), run-locally.sh (§9 "Running CI locally")
   ├── protoFiles/
   │   ├── neuronide.proto   # experiment file schema
   │   └── tests/            # .pbtxt fixtures + compiled .pb
@@ -538,25 +538,33 @@ sudo apt install cmake ninja-build clang-format-20 clang-tidy-20 libsdl2-dev lib
 # GTest, LSL, concurrentqueue, nlohmann/json and Quill are fetched automatically by CMake.
 ```
 
-### Running CI's image locally
+### Running CI locally
 
-Every CI job runs inside the image built from [`ci/Dockerfile`](ci/Dockerfile), published as
-`ghcr.io/kn-neuron/neuron-ide-runtime-ci` and tagged with the file's git hash. When CI fails and
-your machine doesn't, run the same image:
+CI runs the checks in [`ci/checks.sh`](ci/checks.sh) inside the image built from
+[`ci/Dockerfile`](ci/Dockerfile), published as `ghcr.io/kn-neuron/neuron-ide-runtime-ci` and
+tagged with the file's git hash. To run the same checks on your working tree in the same image
+(needs Docker):
+
+```bash
+ci/run-locally.sh               # all of them: format, test (build, tests, coverage), tidy
+ci/run-locally.sh format tidy   # only these
+```
+
+It builds into `build-ci/`, not your `build/`. `tidy` checks the files changed since your branch
+left `origin/main`, as CI does on a pull request; with no `origin/main`, or a changed
+`.clang-tidy`, it checks every file. When it can't pull the image from ghcr.io (CI publishes an
+edited `ci/Dockerfile` only once it runs on it, and a private package needs `docker login
+ghcr.io`), the script builds it from the Dockerfile.
+
+For a shell in the image:
 
 ```bash
 docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/src -w /src \
   ghcr.io/kn-neuron/neuron-ide-runtime-ci:$(git hash-object ci/Dockerfile)
 ```
 
-Inside it, run the steps from [`.github/workflows/ci.yml`](.github/workflows/ci.yml), but with
-`-B build-ci` instead of `-B build`: CMake refuses a build directory configured outside the
-container.
-
-A new build dependency goes into `ci/Dockerfile` (and the `apt install` line above). The CI run
-of the change that edits the file publishes the new image under the file's new hash. To try an
-edited `ci/Dockerfile` before that, or without access to ghcr.io, build it yourself:
-`docker build -t neuronide-ci ci`.
+A new build dependency goes into `ci/Dockerfile` (and the `apt install` line above); a new check
+goes into `ci/checks.sh` and a step in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ### Configure & build
 
@@ -588,8 +596,9 @@ cmake -B build -G Ninja -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF -DCMAKE_EXPORT_COMPIL
 cmake --build build
 ```
 
-CI still runs clang-tidy and fails on any warning, so run the same check before pushing. It
-reads the `compile_commands.json` that `CMAKE_EXPORT_COMPILE_COMMANDS` writes:
+CI still runs clang-tidy and fails on any warning, so run the same check before pushing: with
+`ci/run-locally.sh tidy` ([Running CI locally](#running-ci-locally)), or directly. The direct
+command reads the `compile_commands.json` that `CMAKE_EXPORT_COMPILE_COMMANDS` writes:
 
 ```bash
 git ls-files 'src/*.cpp' 'tests/*.cpp' | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p build --quiet

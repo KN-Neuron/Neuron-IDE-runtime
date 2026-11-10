@@ -7,8 +7,9 @@ You are in the **runtime** repo. Read the system overview below first.
 - Build: `cmake -B build && cmake --build build`. Tests: `cd build && ctest --output-on-failure`
   (`-L unit` / `-L component` / `-L cli`). Format: `cmake --build build --target format` — CI
   fails on unformatted code.
-- CI runs every job in the `ci/Dockerfile` image (Ubuntu 24.04, published to ghcr.io under the
-  file's git hash). A new system dependency goes there too, or CI can't find it (README §9).
+- CI runs `ci/checks.sh` in the `ci/Dockerfile` image (Ubuntu 24.04, published to ghcr.io under
+  the file's git hash); `ci/run-locally.sh` runs the same checks in it. A new system dependency
+  goes into the Dockerfile too, or CI can't find it (README §9).
 - Layout: `include/` headers, `src/` impl, `src/parser/Parser.cpp` turns a `.neuroz`/`.pb` file
   into a `Scene`, `scene/components/` component classes, `tests/{unit,component,cli}_tests/`.
 - Logging: `LOG_*(logging::logger(logging::Subsystem::…), "…{}", …)` from
