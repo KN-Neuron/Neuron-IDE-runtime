@@ -17,7 +17,8 @@ permissions:
 
 jobs:
   # Publishes ci/Dockerfile to ghcr.io under the file's git hash, once per version of the file, so
-  # every job (and anyone who pulls that tag) runs with exactly the same tools.
+  # every job (and ci/run-locally.sh) runs with exactly the same tools. The build gets no context,
+  # so nothing but the Dockerfile can change the image.
   ci-image:
     runs-on: ubuntu-24.04
     permissions:
@@ -46,7 +47,7 @@ jobs:
         if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
           echo "$IMAGE already exists."
         else
-          docker build -t "$IMAGE" ci
+          docker build -t "$IMAGE" - < ci/Dockerfile
           docker push "$IMAGE"
         fi
 
@@ -64,17 +65,10 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Check Code Formatting
-      run: |
-        find src include tests -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" -o -name "*.h" \) | xargs clang-format-20 --dry-run -Werror
+      run: ci/checks.sh format
 
-    - name: Configure CMake
-      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEURON_IDE_ENABLE_COVERAGE=ON -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF
-
-    - name: Build
-      run: cmake --build build --parallel
-
-    - name: Run Tests & Check Coverage
-      run: cmake --build build --target coverage
+    - name: Build, Run Tests & Check Coverage
+      run: ci/checks.sh test
 
   clang-tidy:
     needs: ci-image
@@ -89,26 +83,9 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        # On pull requests HEAD is the merge commit and HEAD^1 the base branch, which the
-        # changed-file list below diffs against.
+        # On pull requests HEAD is the merge commit and HEAD^1 the base branch, which clang-tidy
+        # takes its changed files from. Pushes check every file.
         fetch-depth: 2
 
-    - name: Configure CMake
-      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF
-
-    - name: Generate protobuf headers
-      run: cmake --build build --target neuronide_proto
-
     - name: Run clang-tidy
-      run: |
-        if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && git diff --quiet HEAD^1 HEAD -- .clang-tidy; then
-          files=$(git diff --name-only --diff-filter=d HEAD^1 HEAD -- \
-            'src/*.cpp' 'src/*.hpp' 'include/*.hpp' 'tests/*.cpp' 'tests/*.hpp')
-        else
-          files=$(git ls-files 'src/*.cpp' 'tests/*.cpp')
-        fi
-        if [ -z "$files" ]; then
-          echo "No C++ files changed."
-          exit 0
-        fi
-        echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p build --quiet
+      run: ci/checks.sh tidy ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}

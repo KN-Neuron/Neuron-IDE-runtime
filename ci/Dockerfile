@@ -1,7 +1,7 @@
 # Every CI job runs in this image. CI publishes it as
 # ghcr.io/kn-neuron/neuron-ide-runtime-ci:<git hash-object ci/Dockerfile>, so editing this file is
-# what produces a new image; until then every run, and anyone who pulls that tag, gets the same
-# compiler, SDL, protobuf, clang-format and clang-tidy (README §9 "Running CI's image locally").
+# what produces a new image; until then every run, and ci/run-locally.sh, gets the same compiler,
+# SDL, protobuf, clang-format and clang-tidy.
 FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
