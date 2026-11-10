@@ -17,9 +17,13 @@ class Font {
     // built-in font. Throws std::runtime_error when the font cannot be loaded.
     Font(const std::filesystem::path& path, int pixelSize);
 
-    // UTF-8 `text`, white on a transparent background. Lines break at '\n' and wherever one would
-    // grow past `wrapWidth` pixels, and are centred against each other. Empty when the text has
-    // nothing to draw. Throws std::runtime_error when SDL_ttf cannot render it.
+    // UTF-8 `text`, white on a transparent background, sampled smoothly when drawn rotated. Lines
+    // break at line endings and between words wherever one would grow past `wrapWidth` pixels.
+    // They are centred against each other by what is visible: spaces at either end of a line and
+    // blank lines at either end of the text are left out. A word wider than `wrapWidth` is split
+    // between characters, and a single character wider than it runs past it. Other control
+    // characters are drawn as spaces. Empty when the text has nothing to draw. Throws
+    // std::runtime_error when SDL_ttf cannot measure or render it.
     [[nodiscard]] std::optional<Bitmap> render(std::string_view text, int wrapWidth) const;
 
     // In pixels. A word wider than the wrap width has to be split across lines.

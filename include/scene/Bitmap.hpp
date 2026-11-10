@@ -1,6 +1,7 @@
 #ifndef BITMAP_HPP
 #define BITMAP_HPP
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -13,9 +14,12 @@ class SDL_Renderer;
 // (SDL_RENDER_DEVICE_RESET).
 class Bitmap {
    public:
+    // How the texture is sampled when it is drawn rotated or at another size.
+    enum class ScaleMode : std::uint8_t { Nearest, Linear };
+
     // Takes ownership of `pixels`, which must not be null. `description` says what they are in
     // error messages.
-    Bitmap(SDL_Surface* pixels, std::string description);
+    Bitmap(SDL_Surface* pixels, std::string description, ScaleMode scaleMode = ScaleMode::Nearest);
 
     // Creates the texture on `target`, replacing any earlier one. Throws std::invalid_argument for
     // a null target and std::runtime_error when SDL cannot create the texture, e.g. when the bitmap
@@ -41,6 +45,7 @@ class Bitmap {
 
     std::unique_ptr<SDL_Surface, SurfaceDeleter> pixels;
     std::string                                  description;
+    ScaleMode                                    scaleMode;
     std::unique_ptr<SDL_Texture, TextureDeleter> gpuTexture;
 };
 
