@@ -500,7 +500,6 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
   ├── CMakeLists.txt        # top-level: deps, warnings, static analysis, coverage
   ├── cmake/                # Dependencies / CompilerWarnings / StaticAnalysis / Coverage / EmbedDefaultFont
   ├── assets/fonts/         # the font compiled into the binary, with its license
-  ├── examples/             # experiments you can run, each with its own README
   ├── ci/                   # Dockerfile (CI's image), checks.sh (CI's checks), run-locally.sh (§9 "Running CI locally")
   ├── protoFiles/
   │   ├── neuronide.proto   # experiment file schema
