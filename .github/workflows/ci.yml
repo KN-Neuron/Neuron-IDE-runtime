@@ -6,14 +6,9 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
-<<<<<<< HEAD
-env:
-  BUILD_DEPS: cmake ninja-build libsdl2-dev libsdl2-image-dev protobuf-compiler
-=======
 permissions:
   contents: read
   packages: read
->>>>>>> 87c742f (feat: pin CI to ubuntu 24.04 and create docker container)
 
 jobs:
   # Publishes ci/Dockerfile to ghcr.io under the file's git hash, once per version of the file, so
