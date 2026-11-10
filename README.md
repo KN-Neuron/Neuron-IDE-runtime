@@ -498,6 +498,7 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
   ├── README.md             # this file, code context
   ├── CMakeLists.txt        # top-level: deps, warnings, static analysis, coverage
   ├── cmake/                # Dependencies / CompilerWarnings / StaticAnalysis / Coverage
+  ├── ci/Dockerfile         # the image every CI job runs in (§9 "Running CI's image locally")
   ├── protoFiles/
   │   ├── neuronide.proto   # experiment file schema
   │   └── tests/            # .pbtxt fixtures + compiled .pb
@@ -529,11 +530,33 @@ All commands are run from the `Neuron-IDE-runtime/` directory.
 
 ### Dependencies (Linux)
 
+On Ubuntu 24.04, the release CI runs on (see [`ci/Dockerfile`](ci/Dockerfile)):
+
 ```bash
 sudo apt update
 sudo apt install cmake ninja-build clang-format-20 clang-tidy-20 libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev protobuf-compiler gcovr
 # GTest, LSL, concurrentqueue, nlohmann/json and Quill are fetched automatically by CMake.
 ```
+
+### Running CI's image locally
+
+Every CI job runs inside the image built from [`ci/Dockerfile`](ci/Dockerfile), published as
+`ghcr.io/kn-neuron/neuron-ide-runtime-ci` and tagged with the file's git hash. When CI fails and
+your machine doesn't, run the same image:
+
+```bash
+docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/src -w /src \
+  ghcr.io/kn-neuron/neuron-ide-runtime-ci:$(git hash-object ci/Dockerfile)
+```
+
+Inside it, run the steps from [`.github/workflows/ci.yml`](.github/workflows/ci.yml), but with
+`-B build-ci` instead of `-B build`: CMake refuses a build directory configured outside the
+container.
+
+A new build dependency goes into `ci/Dockerfile` (and the `apt install` line above). The CI run
+of the change that edits the file publishes the new image under the file's new hash. To try an
+edited `ci/Dockerfile` before that, or without access to ghcr.io, build it yourself:
+`docker build -t neuronide-ci ci`.
 
 ### Configure & build
 
