@@ -13,20 +13,26 @@ void Bitmap::TextureDeleter::operator()(SDL_Texture* texture) const noexcept {
     SDL_DestroyTexture(texture);
 }
 
-Bitmap::Bitmap(SDL_Surface* pixels, std::string description)
-    : pixels(pixels), description(std::move(description)) {}
+Bitmap::Bitmap(SDL_Surface* pixels, std::string description, ScaleMode scaleMode)
+    : pixels(pixels), description(std::move(description)), scaleMode(scaleMode) {}
 
 void Bitmap::upload(const std::shared_ptr<SDL_Renderer>& target) {
     if (!target) {
         throw std::invalid_argument("Bitmap: render target must not be null");
     }
 
-    SDL_Texture* created = SDL_CreateTextureFromSurface(target.get(), pixels.get());
-    if (created == nullptr) {
+    std::unique_ptr<SDL_Texture, TextureDeleter> created(
+        SDL_CreateTextureFromSurface(target.get(), pixels.get()), TextureDeleter{target});
+    if (!created) {
         throw std::runtime_error("cannot create a texture from " + description + ": " +
                                  SDL_GetError());
     }
-    gpuTexture = std::unique_ptr<SDL_Texture, TextureDeleter>(created, TextureDeleter{target});
+    const SDL_ScaleMode sdlScaleMode =
+        scaleMode == ScaleMode::Linear ? SDL_ScaleModeLinear : SDL_ScaleModeNearest;
+    if (SDL_SetTextureScaleMode(created.get(), sdlScaleMode) != 0) {
+        throw std::runtime_error("cannot set how " + description + " is scaled: " + SDL_GetError());
+    }
+    gpuTexture = std::move(created);
 }
 
 int Bitmap::width() const noexcept { return pixels->w; }

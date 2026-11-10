@@ -51,7 +51,7 @@ TextRenderer::TextRenderer(const std::shared_ptr<SceneObject>& owner, std::strin
 
     font      = std::make_unique<Font>(fontPath, static_cast<int>(fontSize));
     wrapWidth = static_cast<int>(std::ceil(transform.width));
-    rasterize();
+    bitmap    = font->render(text, wrapWidth);
 
     if (!bitmap) {
         LOG_WARNING(logger(), "{} has no text and draws nothing", who);
@@ -64,18 +64,17 @@ TextRenderer::TextRenderer(const std::shared_ptr<SceneObject>& owner, std::strin
     }
 }
 
-void TextRenderer::rasterize() {
-    bitmap = font->render(text, wrapWidth);
-    if (bitmap && renderTarget) {
-        bitmap->upload(renderTarget);
-    }
-}
-
 void TextRenderer::setText(std::string_view newText) {
-    if (newText != text) {
-        text = newText;
-        rasterize();
+    if (newText == text) {
+        return;
     }
+    // Built aside, so a throw leaves the old text in place.
+    std::optional<Bitmap> next = font->render(newText, wrapWidth);
+    if (next && renderTarget) {
+        next->upload(renderTarget);
+    }
+    bitmap = std::move(next);
+    text   = newText;
 }
 
 void TextRenderer::update(const Context& context) { (void)context; }

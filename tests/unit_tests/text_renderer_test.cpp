@@ -9,11 +9,14 @@
 #include <fstream>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include "scene/Font.hpp"
 #include "scene/SceneObject.hpp"
 #include "scene/components/TextRenderer.hpp"
 #include "utils/SdlTestUtils.hpp"
@@ -38,6 +41,10 @@ constexpr double        kQuarterTurn  = 90.0;
 constexpr double        kBeyondInt    = 1e30;
 constexpr double        kNarrowBox    = 30.0;
 constexpr double        kTinyBox      = 1.0;
+// Fits "AAA" but not "AAA BBB" at kFontSize.
+constexpr double kOneWordBox  = 60.0;
+constexpr double kBlocksInBox = 2.5;
+constexpr int    kHugeWrap    = 5000;
 
 constexpr utils::Rgba kBackground{200, 0, 0, 255};
 constexpr utils::Rgba kWhite{255, 255, 255, 255};
@@ -49,6 +56,7 @@ constexpr std::string_view kTwoLines    = "\xE2\x96\x88\n\xE2\x96\x88";
 constexpr std::string_view kTwoWords    = "\xE2\x96\x88 \xE2\x96\x88";
 // Three blocks over one: the line of one block has to be centred under the wider one.
 constexpr std::string_view kWideOverNarrow = "\xE2\x96\x88\xE2\x96\x88\xE2\x96\x88\n\xE2\x96\x88";
+constexpr std::string_view kTwoOverOne     = "\xE2\x96\x88\xE2\x96\x88\n\xE2\x96\x88";
 // U+E000, from the private use area, which the built-in font has no glyph for.
 constexpr std::string_view kMissingGlyph = "\xEE\x80\x80";
 
@@ -71,6 +79,15 @@ struct Extent {
 const utils::Rgba& at(const Canvas& canvas, int column, int row) {
     const int index = (row * kCanvasWidth) + column;
     return canvas.at(static_cast<std::size_t>(index));
+}
+
+Bitmap rendered(std::string_view text, int wrapWidth) {
+    const Font            font({}, static_cast<int>(kFontSize));
+    std::optional<Bitmap> bitmap = font.render(text, wrapWidth);
+    if (!bitmap) {
+        throw std::runtime_error("nothing was rendered");
+    }
+    return std::move(*bitmap);
 }
 
 Extent extentOf(const Canvas& canvas) {
@@ -229,17 +246,51 @@ TEST_F(TextRendererTest, CentresLinesAgainstEachOther) {
     EXPECT_NEAR(lastLineCentre, kBoxCentreX, kTolerance);
 }
 
-TEST_F(TextRendererTest, TrailingWhitespaceDrawsNothingExtra) {
-    const Canvas plain = drawn("A");
+// SDL_ttf keeps the spaces at a break on the line and centres them with it.
+TEST_F(TextRendererTest, SpacesAtALineBreakDoNotMoveTheText) {
+    owner()->transform.width  = kOneWordBox;
+    const Canvas brokenByHand = drawn("AAA\nBBB");
 
-    EXPECT_EQ(drawn("A\n"), plain);
-    EXPECT_EQ(drawn("A\r\n"), plain);
-    EXPECT_EQ(drawn("A  "), plain);
+    EXPECT_EQ(drawn("AAA BBB"), brokenByHand);
+    EXPECT_EQ(drawn("AAA      BBB"), brokenByHand);
+    EXPECT_EQ(drawn("AAA      \nBBB"), brokenByHand);
+    EXPECT_EQ(drawn("AAA\n      BBB"), brokenByHand);
 }
 
-TEST_F(TextRendererTest, CarriageReturnsAndTabsDrawNoMissingGlyphBoxes) {
-    EXPECT_EQ(drawn("A\r\nB"), drawn("A\nB"));
-    EXPECT_EQ(drawn("A\tB"), drawn("A B"));
+TEST_F(TextRendererTest, KeepsTheSpacesBetweenWordsOnALine) {
+    EXPECT_GT(drawnExtent("A   B").width(), drawnExtent("A B").width());
+}
+
+TEST_F(TextRendererTest, SplitsAWordWiderThanTheBoxBetweenCharacters) {
+    owner()->transform.width = kBlocksInBox * drawnExtent(kBlock).width();
+
+    EXPECT_EQ(drawn(kThreeBlocks), drawn(kTwoOverOne));
+}
+
+TEST_F(TextRendererTest, WhitespaceAroundTheTextDrawsNothingExtra) {
+    const Canvas plain = drawn("A");
+
+    for (const std::string_view padded : {"A\n", "A\r\n", "A  ", "  A", "\nA", " \n A \n "}) {
+        EXPECT_EQ(drawn(padded), plain) << "'" << padded << "'";
+    }
+}
+
+TEST_F(TextRendererTest, AnyLineEndingBreaksTheLine) {
+    const Canvas twoLines = drawn("A\nB");
+
+    EXPECT_EQ(drawn("A\r\nB"), twoLines);
+    EXPECT_EQ(drawn("A\rB"), twoLines);
+}
+
+TEST_F(TextRendererTest, OtherControlCharactersAreDrawnAsSpaces) {
+    using namespace std::string_view_literals;
+    const Canvas spaced = drawn("A B");
+
+    for (const std::string_view control :
+         {"\t"sv, "\v"sv, "\f"sv, "\x01"sv, "\x1F"sv, "\x7F"sv, "\0"sv}) {
+        EXPECT_EQ(drawn("A" + std::string(control) + "B"), spaced)
+            << "byte " << static_cast<int>(control.front());
+    }
 }
 
 TEST_F(TextRendererTest, TextWithNothingToDrawLeavesTheCanvasAlone) {
@@ -328,14 +379,33 @@ TEST_F(TextRendererTest, SetTextToNothingStopsDrawing) {
     EXPECT_TRUE(extentOf(canvas()).empty());
 }
 
-TEST_F(TextRendererTest, TextThatDoesNotFitItsBoxIsStillDrawn) {
+TEST_F(TextRendererTest, TextThatDoesNotFitItsBoxRunsPastItWhole) {
+    const Extent inBox = drawnExtent(kBlock);
+
     owner()->transform.width  = kTinyBox;
     owner()->transform.height = kTinyBox;
+    const Extent pastBox      = drawnExtent(kBlock);
 
-    TextRenderer text(owner(), kBlock, "", kFontSize);
-    drawOnto(text);
+    EXPECT_EQ(pastBox.width(), inBox.width());
+    EXPECT_EQ(pastBox.height(), inBox.height());
+}
 
-    EXPECT_FALSE(extentOf(canvas()).empty());
+TEST_F(TextRendererTest, TextureIsAsWideAsTheTextNotTheBox) {
+    const int inBox     = rendered("A", static_cast<int>(kBoxWidth)).width();
+    const int inHugeBox = rendered("A", kHugeWrap).width();
+
+    EXPECT_LT(inBox, kBoxWidth);
+    EXPECT_EQ(inHugeBox, inBox);
+}
+
+// Nearest-neighbour sampling would turn the antialiased edges of rotated text into steps.
+TEST_F(TextRendererTest, TextureIsSampledSmoothly) {
+    Bitmap bitmap = rendered(kBlock, static_cast<int>(kBoxWidth));
+    bitmap.upload(target());
+
+    SDL_ScaleMode mode = SDL_ScaleModeNearest;
+    ASSERT_EQ(SDL_GetTextureScaleMode(bitmap.texture(), &mode), 0) << SDL_GetError();
+    EXPECT_EQ(mode, SDL_ScaleModeLinear);
 }
 
 TEST_F(TextRendererTest, ThrowsWhenDrawingFails) {

@@ -20,7 +20,8 @@ class Component;
 
 // Draws white text centred in its owner's Transform and rotated, in degrees clockwise, about the
 // rectangle's centre. The font size is the size on screen: the text is never stretched to the
-// rectangle. It wraps at the rectangle's width, and text taller than the rectangle runs past it.
+// rectangle. It wraps at the rectangle's width, and a character wider than the rectangle, or text
+// taller than it, runs past it.
 //
 // The whole text is one texture, drawn in one call, so a frame costs the same however long the
 // text is. It is rendered while the scene is parsed, so a missing font fails before any window
@@ -38,7 +39,8 @@ class TextRenderer : public Component {
 
     // Renders and uploads the new text straight away, so call it on the render thread, before the
     // frame is drawn. Costs nothing when the text is unchanged. Throws what the constructor throws
-    // for text that cannot be rendered, and std::runtime_error when it cannot be uploaded.
+    // for text that cannot be rendered, and std::runtime_error when it cannot be uploaded; either
+    // way the old text stays, both on screen and as the text.
     void setText(std::string_view newText);
 
     void update(const Context& context) override;
@@ -54,8 +56,6 @@ class TextRenderer : public Component {
                                                  const ComponentBuildContext&        context);
 
    private:
-    void rasterize();
-
     std::unique_ptr<Font>         font;
     std::string                   text;
     int                           wrapWidth = 0;
