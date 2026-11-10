@@ -20,9 +20,17 @@ check_format() {
 check_test() {
     cmake -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DNEURON_IDE_ENABLE_COVERAGE=ON \
         -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF
-    cmake --build "$build" --parallel
-    # A reused build directory keeps the counts of earlier runs, which would add to this one's.
+    # A build directory reused across branches (ci/run-locally.sh) keeps what earlier builds left:
+    # coverage notes of objects this branch doesn't build, which make gcovr fail, and execution
+    # counts, which would add to this run's.
+    local objects
+    objects=$(ninja -C "$build" -t targets all | sed -n 's/\.o: .*/.o/p')
+    find "$build" -name '*.gcno' | while read -r notes; do
+        object=${notes#"$build"/}
+        grep -qxF "${object%.gcno}.o" <<< "$objects" || rm "$notes"
+    done
     find "$build" -name '*.gcda' -delete
+    cmake --build "$build" --parallel
     cmake --build "$build" --target coverage
 }
 
