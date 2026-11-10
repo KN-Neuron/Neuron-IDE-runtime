@@ -6,21 +6,62 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
+<<<<<<< HEAD
 env:
   BUILD_DEPS: cmake ninja-build libsdl2-dev libsdl2-image-dev protobuf-compiler
+=======
+permissions:
+  contents: read
+  packages: read
+>>>>>>> 87c742f (feat: pin CI to ubuntu 24.04 and create docker container)
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
+  # Publishes ci/Dockerfile to ghcr.io under the file's git hash, once per version of the file, so
+  # every job (and anyone who pulls that tag) runs with exactly the same tools.
+  ci-image:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.tag.outputs.image }}
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Pick the image tag
+      id: tag
+      run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}-ci:$(git hash-object ci/Dockerfile)" >> "$GITHUB_OUTPUT"
+
+    - name: Log in to ghcr.io
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+    - name: Build and push the image unless it already exists
+      env:
+        IMAGE: ${{ steps.tag.outputs.image }}
       run: |
-        sudo apt-get update
-        sudo apt-get install -y $BUILD_DEPS clang-format-20 gcovr
+        if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+          echo "$IMAGE already exists."
+        else
+          docker build -t "$IMAGE" ci
+          docker push "$IMAGE"
+        fi
+
+  build-and-test:
+    needs: ci-image
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.ci-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
     - name: Check Code Formatting
       run: |
@@ -36,7 +77,13 @@ jobs:
       run: cmake --build build --target coverage
 
   clang-tidy:
-    runs-on: ubuntu-latest
+    needs: ci-image
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.ci-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
     - name: Checkout repository
@@ -45,11 +92,6 @@ jobs:
         # On pull requests HEAD is the merge commit and HEAD^1 the base branch, which the
         # changed-file list below diffs against.
         fetch-depth: 2
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y $BUILD_DEPS clang-tidy-20
 
     - name: Configure CMake
       run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DNEURON_IDE_ENABLE_CLANG_TIDY=OFF
