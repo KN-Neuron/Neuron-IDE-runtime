@@ -12,7 +12,11 @@ struct Context;
 class SceneObject {
    public:
     std::string name;
-    bool        isVisible = true;
+
+    // Whether the object takes part in the scene at all. An inactive object is neither drawn nor
+    // updated, and neither are its components. Set by the experiment file and by scripts; no
+    // component writes it, so it is safe to attach appear/disappear events to its changes.
+    bool isActive = true;
 
     struct Transform {
         double posX = 0, posY = 0, width = 0, height = 0, rotation = 0;
@@ -24,7 +28,7 @@ class SceneObject {
 
     std::vector<std::unique_ptr<Component>> components;
 
-    SceneObject(std::string n, bool visible = true);
+    SceneObject(std::string n, bool active = true);
 
     void setTransform(const Transform& transform);
 

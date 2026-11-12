@@ -77,18 +77,18 @@ TEST(ParserSceneObjectTest, ObjectNameIsCorrect) {
     EXPECT_EQ(result->getObjects()[0]->name, "MojaRakieta");
 }
 
-TEST(ParserSceneObjectTest, ObjectIsVisibleWhenTrue) {
+TEST(ParserSceneObjectTest, ObjectIsActiveWhenIsVisibleTrue) {
     auto scene =
         utils::buildSimpleScene({.projectName = "P", .objectName = "Obj", .isVisible = true});
     auto result = utils::parseProtoScene(scene);
-    EXPECT_TRUE(result->getObjects()[0]->isVisible);
+    EXPECT_TRUE(result->getObjects()[0]->isActive);
 }
 
-TEST(ParserSceneObjectTest, ObjectIsHiddenWhenFalse) {
+TEST(ParserSceneObjectTest, ObjectIsInactiveWhenIsVisibleFalse) {
     auto scene =
         utils::buildSimpleScene({.projectName = "P", .objectName = "Obj", .isVisible = false});
     auto result = utils::parseProtoScene(scene);
-    EXPECT_FALSE(result->getObjects()[0]->isVisible);
+    EXPECT_FALSE(result->getObjects()[0]->isActive);
 }
 
 TEST(ParserSceneObjectTest, ObjectsPreserveInsertionOrder) {

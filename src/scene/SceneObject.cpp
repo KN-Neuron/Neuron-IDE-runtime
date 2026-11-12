@@ -27,7 +27,7 @@ void SceneObject::Transform::requireDrawable(const std::string& who) const {
     }
 }
 
-SceneObject::SceneObject(std::string n, bool visible) : name(std::move(n)), isVisible(visible) {}
+SceneObject::SceneObject(std::string n, bool active) : name(std::move(n)), isActive(active) {}
 
 void SceneObject::setTransform(const Transform& transform) { this->transform = transform; }
 
@@ -36,12 +36,23 @@ void SceneObject::addComponent(std::unique_ptr<Component> comp) {
 }
 
 void SceneObject::update(const Context& ctx) {
+    if (!isActive) {
+        return;
+    }
     for (const auto& comp : components) {
         comp->update(ctx);
     }
 }
 
 void SceneObject::render(SDL_Renderer* renderer) {
+    if (!isActive) {
+        return;
+    }
+    for (const auto& comp : components) {
+        if (!comp->allowsDrawing()) {
+            return;
+        }
+    }
     for (const auto& comp : components) {
         comp->render(renderer);
     }
