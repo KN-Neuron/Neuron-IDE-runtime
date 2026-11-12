@@ -111,7 +111,7 @@ classDiagram
     }
     class SceneObject {
         +string name
-        +bool isVisible
+        +bool isActive
         +Transform transform
         -vector~unique_ptr~Component~~ components
         +update(Context&) void
@@ -122,6 +122,7 @@ classDiagram
         #weak_ptr~SceneObject~ owner
         +update(Context&)* void
         +render(SDL_Renderer*)* void
+        +allowsDrawing() bool
     }
     class BlinkComponent
     class SpriteRenderer
@@ -437,7 +438,7 @@ Update the row in the same PR that changes it.
 | Transform | Position, size, rotation. Exactly one per object. x/y is the top-left corner in window pixels, rotation is degrees clockwise about the centre. | `SceneObject.transform`, a field rather than a `Component` | `SceneObject::Transform` | **Partial**: parsed onto the object and drawn by SpriteRenderer and TextRenderer, but not required (an object without one sits at all zeros; a sprite with an image or any text object on it is rejected at parse time, as is a non-finite value) | — |
 | SpriteRenderer | Draws an image: visual stimuli, photos, icons. | `SpriteRenderer` (`renderer = 1`), `img_path`. The runtime does not read `texture_path` | `SpriteRenderer`, registered | **Implemented**: any SDL2_image format (PNG, JPEG, …), stretched over the Transform and rotated. Decoded at parse time, so a missing or unreadable file stops the run before the window opens; uploaded to the GPU before the first frame. Objects showing the same file share one decoded image. An empty `img_path` draws nothing | [#17][rt-17], [backend#25][be-25] |
 | TextRenderer | Draws text in a chosen font and size: instructions, letters, numbers. | `TextRenderer` (`text = 2`), `text`, `font_path`, `font_size` | `TextRenderer`, registered | **Implemented**: white, because the message has no text color. `font_size` is the em size in pixels (1 to 4096) and the text is never stretched: it is centred in the Transform and rotates about its centre, with smooth edges. It wraps between words at the Transform's width and splits a word only when the word alone is wider than the box. Spaces at the ends of lines are dropped, so each line is centred by what is visible. A character wider than the box, or text taller than it, runs past it, with a warning. Control characters other than line breaks are drawn as spaces. An empty `font_path` uses the built-in DejaVu Sans; a named font that is missing or unreadable stops the run before the window opens. Empty text draws nothing. `setText()` changes the text during a run, at the cost of one render and upload; if it fails, the old text stays on screen | [#18][rt-18], [backend#25][be-25] |
-| BlinkComponent | Flickers the object at a set frequency in Hz. The basis for SSVEP. | `BlinkComponent` (`blinker = 3`) | `BlinkComponent`, registered and built by the parser | **In review**: `update()` is an empty TODO on `main`, so nothing blinks yet. PR [#34][rt-34] implements it; changes requested | [#16][rt-16] |
+| BlinkComponent | Flickers the object at a set frequency in Hz. The basis for SSVEP. | `BlinkComponent` (`blinker = 3`) | `BlinkComponent`, registered and built by the parser | **Partial**: `update()` sums the frame deltas into a phase and the component is lit while `sin(2π·f·t) >= 0` (starts lit). The owner is drawn only while every component allows it (`Component::allowsDrawing()`), so the blinker never writes to the owner. `setFrequency()` restarts the cycle. A frequency that is 0, negative or not finite means no blinking (the component stays lit), and the parser warns about it. Not frame-locked yet (see open questions). PR [#34][rt-34] | [#16][rt-16] |
 | MarkerEmitter | Emits an LSL marker on a scene event, ideally when an object appears or disappears. | `MarkerEmitterComponent` (`marker_emitter = 5`). Missing from the backend's copy | `MarkerEmitterComponent`, registered | **Implemented, nothing to bind to**: bindings resolve and push markers (tested against a test-only event source), but no production component exposes an event and objects have no appear/disappear events, so any binding in a real `.neuroz` fails at parse time | [backend#23][be-23] |
 | Lifetime | Keeps the object visible for N ms, then hides it. | — | — | **Not started** | — |
 | ResponseListener | While its object is active, records which key was pressed and the reaction time. | — | — | **Not started** | — |
@@ -459,11 +460,12 @@ Update the row in the same PR that changes it.
 - **Event sources.** `MarkerEmitter` binds to events that a component exposes through
   `getEvent()`, and nothing exposes one yet. The obvious first sources are an object
   appearing or disappearing, a Lifetime timeout and a ResponseListener response.
-- **Who owns visibility.** Blink, Lifetime and scripts all write `SceneObject::isVisible`.
-  If appear/disappear events follow that flag, a 15 Hz blinker emits 30 markers a second,
-  and the 0 Hz branch in PR [#34][rt-34] overrides a script that hides the object. Keeping
-  "the object is shown in this trial" (Lifetime, scripts; drives the events) separate from
-  "flicker phase" (Blink; affects drawing only) avoids both.
+- **Who owns visibility.** Settled in PR [#34][rt-34]: `SceneObject::isActive` means "the
+  object is shown in this trial". The experiment file, scripts and Lifetime write it, and
+  an inactive object is neither updated nor drawn. Appear/disappear events should follow
+  that flag. The flicker phase stays inside `BlinkComponent` and only vetoes drawing through
+  `Component::allowsDrawing()`, so a 15 Hz blinker emits no events and cannot override a
+  script that hides the object. Lifetime still has to be written against `isActive`.
 - **Frame-locked timing.** The screen only changes at vsync, and markers are stamped there.
   Flicker phase and Lifetime durations should come from the frame being presented (frame
   count × refresh period), not from summing `Context::timestamp`. That value is a loop

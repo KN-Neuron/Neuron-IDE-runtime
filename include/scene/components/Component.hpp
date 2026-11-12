@@ -24,6 +24,10 @@ class Component {
     virtual void update(const Context& context) = 0;
     virtual void render(SDL_Renderer* renderer) = 0;
 
+    // Lets a component veto drawing its owner without touching the owner's own state. A
+    // SceneObject draws only while every one of its components allows it.
+    virtual bool allowsDrawing() const { return true; }
+
     virtual void onSceneReady(Scene& scene) { (void)scene; }
 
     // Called once the render target this scene is drawn to exists, before the first frame, and
