@@ -43,6 +43,8 @@ class TextRenderer : public Component {
     // way the old text stays, both on screen and as the text.
     void setText(std::string_view newText);
 
+    [[nodiscard]] const std::string& getText() const;
+
     void update(const Context& context) override;
 
     // Draws nothing while the text has no texture yet. Throws std::runtime_error when SDL fails to

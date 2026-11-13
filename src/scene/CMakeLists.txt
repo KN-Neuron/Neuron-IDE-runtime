@@ -25,6 +25,7 @@ add_library(scene OBJECT
     components/MarkerEmitterComponent.cpp
     components/SpriteRenderer.cpp
     components/TextRenderer.cpp
+    components/ScriptComponent.cpp
 )
 target_include_directories(scene PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
@@ -37,4 +38,7 @@ target_link_libraries(scene PUBLIC
     SDL2_ttf::SDL2_ttf
 )
 
-target_link_libraries(scene PRIVATE logging default_font)
+target_link_libraries(scene PRIVATE logging default_font pybind11::embed)
+# pybind11 declares its namespace hidden, and GCC warns about any type of default visibility that
+# holds a py::object (ScriptComponent's state). Nothing here is exported from a shared library.
+set_target_properties(scene PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)

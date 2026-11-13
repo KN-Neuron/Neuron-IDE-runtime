@@ -28,8 +28,8 @@ constexpr const char* kTimestampFormat = "%Y-%m-%d %H:%M:%S.%Qms";
 constexpr auto kBackendSleep = std::chrono::milliseconds(5);
 
 // logger() indexes its cache by enumerator value: list every one, in order.
-constexpr std::array kSubsystems{Subsystem::App, Subsystem::Runtime, Subsystem::LslReader,
-                                 Subsystem::Renderer, Subsystem::Scene};
+constexpr std::array kSubsystems{Subsystem::App,      Subsystem::Runtime, Subsystem::LslReader,
+                                 Subsystem::Renderer, Subsystem::Scene,   Subsystem::Script};
 
 const char* nameOf(Subsystem subsystem) {
     switch (subsystem) {
@@ -43,6 +43,8 @@ const char* nameOf(Subsystem subsystem) {
             return "renderer";
         case Subsystem::Scene:
             return "scene";
+        case Subsystem::Script:
+            return "script";
     }
     return "unknown";
 }

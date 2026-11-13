@@ -11,12 +11,13 @@
 namespace {
 using logging::Subsystem;
 
-constexpr std::array<std::pair<Subsystem, std::string_view>, 5> kExpectedNames{{
+constexpr std::array<std::pair<Subsystem, std::string_view>, 6> kExpectedNames{{
     {Subsystem::App, "app"},
     {Subsystem::Runtime, "runtime"},
     {Subsystem::LslReader, "lslreader"},
     {Subsystem::Renderer, "renderer"},
     {Subsystem::Scene, "scene"},
+    {Subsystem::Script, "script"},
 }};
 }  // namespace
 
