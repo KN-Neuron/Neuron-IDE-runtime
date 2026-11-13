@@ -109,6 +109,9 @@ launcher#1.
 - Experiment flow graph is not in the proto, so it isn't saved, exported or run (epic frontend#59).
 - Scene object color and LSL marker are not persisted (frontend#56, backend#24).
 - Media files (images, audio, scripts) can't be uploaded, so the runtime can't find them (backend#25).
+- Scripts: the editor creates JavaScript templates kept only in localStorage, while the runtime
+  runs Python files defining one `neuronide.Script` subclass (runtime#44). Which Python the lab
+  PCs embed is not decided (pybind11 needs 3.9 or newer).
 - Auth is a placeholder (frontend#57, backend#14).
 - Subject form has no format yet (frontend#64).
 - Runtime main loop and CLI `NeuronIDE [config.json] <experiment.neuroz>` are still in review

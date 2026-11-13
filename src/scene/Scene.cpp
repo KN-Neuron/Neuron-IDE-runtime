@@ -52,3 +52,12 @@ Delegate& Scene::resolveEvents(std::string_view objectName, std::string_view eve
     throw std::runtime_error("Scene::resolveEvents: object '" + std::string(objectName) +
                              "' not found");
 }
+
+std::shared_ptr<SceneObject> Scene::findObject(std::string_view objectName) const {
+    for (const auto& obj : objects) {
+        if (obj->name == objectName) {
+            return obj;
+        }
+    }
+    return nullptr;
+}

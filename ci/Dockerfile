@@ -11,6 +11,7 @@ RUN apt-get update \
         g++ cmake ninja-build \
         libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev \
         libprotobuf-dev protobuf-compiler \
+        python3-dev \
         clang-format-20 clang-tidy-20 gcovr \
     && rm -rf /var/lib/apt/lists/*
 

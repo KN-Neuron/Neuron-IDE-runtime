@@ -36,6 +36,9 @@ class Scene {
     // first frame and again whenever the target has lost its textures.
     void      onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target);
     Delegate& resolveEvents(std::string_view objectName, std::string_view eventName);
+
+    // The first object called `objectName`, or null.
+    [[nodiscard]] std::shared_ptr<SceneObject> findObject(std::string_view objectName) const;
 };
 
 #endif  // SCENE_HPP

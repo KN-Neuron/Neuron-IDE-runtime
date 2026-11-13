@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <fstream>
 #include <sstream>
 #include <string>
 
@@ -41,6 +42,9 @@ TEST(ComponentRegistrationTest, EveryImplementedComponentIsLinkedIn) {
     addObjectWithComponent(proto, "MarkerEmitter")->mutable_marker_emitter();
     addObjectWithComponent(proto, "Sprite")->mutable_renderer()->set_img_path("sprite.png");
     addObjectWithComponent(proto, "Text")->mutable_text()->set_font_size(kFontSize);
+    std::ofstream(assets.path() / "script.py")
+        << "import neuronide\n\nclass Registered(neuronide.Script):\n    pass\n";
+    addObjectWithComponent(proto, "Script")->mutable_script()->set_script_path("script.py");
 
     std::stringstream stream;
     ASSERT_TRUE(proto.SerializeToOstream(&stream));

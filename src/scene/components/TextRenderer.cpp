@@ -77,6 +77,8 @@ void TextRenderer::setText(std::string_view newText) {
     text   = newText;
 }
 
+const std::string& TextRenderer::getText() const { return text; }
+
 void TextRenderer::update(const Context& context) { (void)context; }
 
 void TextRenderer::render(SDL_Renderer* renderer) {

@@ -6,6 +6,7 @@ target_include_directories(neuronide_proto SYSTEM PUBLIC ${CMAKE_CURRENT_BINARY_
 target_link_libraries(neuronide_proto PUBLIC protobuf::libprotobuf)
 
 add_subdirectory(logging)
+add_subdirectory(scripting)
 add_subdirectory(scene)
 add_subdirectory(parser)
 add_subdirectory(config)
@@ -19,6 +20,7 @@ add_library(runtime_core_archive STATIC
 target_include_directories(runtime_core_archive PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(runtime_core_archive PUBLIC
     logging
+    scripting
     scene
     parser
     config
