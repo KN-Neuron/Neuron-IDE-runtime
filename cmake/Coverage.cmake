@@ -32,7 +32,7 @@ if(NEURON_IDE_ENABLE_COVERAGE)
             --exclude ".*\\.hpp"
             --exclude-throw-branches
             --exclude-unreachable-branches
-            --fail-under-line 90
+            --fail-under-line 95
             --print-summary
             --html-details ${COVERAGE_DIR}/index.html
             --xml ${COVERAGE_DIR}/coverage.xml
