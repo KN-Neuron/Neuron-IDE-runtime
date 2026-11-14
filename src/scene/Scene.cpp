@@ -37,7 +37,14 @@ void Scene::update(const Context& ctx) {
 
     const FrameScope scope(frame, ctx);
     for (const auto& obj : objects) {
+        if (!obj->isActive) {
+            continue;
+        }
         obj->update(ctx);
+    }
+
+    for (const auto& obj : objects) {
+        obj->dispatchActivateStatusChange(ctx);
     }
 }
 
@@ -51,6 +58,9 @@ void Scene::emitMarker(std::string name) {
 
 void Scene::render(SDL_Renderer* renderer) {
     for (const auto& obj : objects) {
+        if (!obj->isActive) {
+            continue;
+        }
         obj->render(renderer);
     }
 }
@@ -76,6 +86,9 @@ Delegate& Scene::resolveEvents(std::string_view objectName, std::string_view eve
     for (const auto& obj : objects) {
         if (obj->name != objectName) {
             continue;
+        }
+        if (Delegate* own = obj->getEvent(eventName); own != nullptr) {
+            return *own;
         }
         for (const auto& comp : obj->components) {
             auto* delegate = comp->getEvent(eventName);

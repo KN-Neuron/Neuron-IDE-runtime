@@ -43,7 +43,10 @@ class Scene : public std::enable_shared_from_this<Scene> {
     void onSceneReady();
     // Uploads the scene's images to `target`, then hands it to every component. Runs before the
     // first frame and again whenever the target has lost its textures.
-    void      onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target);
+    void onRenderTargetReady(const std::shared_ptr<SDL_Renderer>& target);
+
+    // The object's own event of that name ("activate", "deactivate"), else the first of its
+    // components' events. Throws std::runtime_error when there is none.
     Delegate& resolveEvents(std::string_view objectName, std::string_view eventName);
 
     // The first object called `objectName`, or null.

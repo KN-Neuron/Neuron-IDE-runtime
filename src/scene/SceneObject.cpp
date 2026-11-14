@@ -57,3 +57,25 @@ void SceneObject::render(SDL_Renderer* renderer) {
         comp->render(renderer);
     }
 }
+
+Delegate* SceneObject::getEvent(std::string_view eventName) {
+    if (eventName == "activate") {
+        return &onActivate;
+    }
+    if (eventName == "deactivate") {
+        return &onDeactivate;
+    }
+    return nullptr;
+}
+
+void SceneObject::dispatchActivateStatusChange(const Context& ctx) {
+    if (isActive == wasActive) {
+        return;
+    }
+    wasActive = isActive;
+    if (isActive) {
+        onActivate.invoke(ctx);
+    } else {
+        onDeactivate.invoke(ctx);
+    }
+}
