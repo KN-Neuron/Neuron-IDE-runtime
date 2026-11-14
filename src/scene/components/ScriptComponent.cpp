@@ -27,32 +27,12 @@ struct ScriptComponent::Host {
     // "ScriptComponent on '<object>' (<path>)", to prefix errors with.
     std::string                where;
     std::weak_ptr<SceneObject> owner;
-    Scene*                     scene = nullptr;
+    std::weak_ptr<Scene>       scene;
 
     py::object              instance;
     script_api::ScriptBase* base = nullptr;
     py::object              onStart;
     py::object              onUpdate;
-
-    // The frame being updated, or null outside update(): markers emitted then (from on_start) are
-    // held for the next frame.
-    const Context*           frame = nullptr;
-    std::vector<std::string> heldMarkers;
-
-    void emitMarker(std::string name) {
-        if (frame == nullptr) {
-            heldMarkers.push_back(std::move(name));
-        } else if (frame->markers != nullptr) {
-            frame->markers->push_back(std::move(name));
-        }
-    }
-
-    void flushHeldMarkers(const Context& context) {
-        if (context.markers != nullptr) {
-            context.markers->insert(context.markers->end(), heldMarkers.begin(), heldMarkers.end());
-        }
-        heldMarkers.clear();
-    }
 
     // A Python exception becomes a std::runtime_error here, while the interpreter still runs: an
     // error_already_set that outlived it would crash when destroyed.
@@ -113,13 +93,21 @@ class ObjectRef {
     std::weak_ptr<SceneObject> object;
 };
 
-// neuronide.Scene.
+// neuronide.Scene
 class SceneRef {
    public:
-    explicit SceneRef(Scene& scene) : scene(&scene) {}
+    explicit SceneRef(std::weak_ptr<Scene> scene) : scene(std::move(scene)) {}
+
+    [[nodiscard]] std::shared_ptr<Scene> get() const {
+        auto locked = scene.lock();
+        if (!locked) {
+            throw std::runtime_error("the scene no longer exists");
+        }
+        return locked;
+    }
 
     [[nodiscard]] ObjectRef find(std::string_view name) const {
-        auto object = scene->findObject(name);
+        auto object = get()->findObject(name);
         if (!object) {
             throw py::key_error("no scene object named '" + std::string(name) + "'");
         }
@@ -127,29 +115,12 @@ class SceneRef {
     }
 
    private:
-    Scene* scene;
+    std::weak_ptr<Scene> scene;
 };
 
 }  // namespace script_api
 
 namespace {
-
-// Points the host at the frame being updated for as long as it lives.
-class FrameScope {
-   public:
-    FrameScope(ScriptComponent::Host& host, const Context& frame) : host(&host) {
-        host.frame = &frame;
-    }
-    ~FrameScope() { host->frame = nullptr; }
-
-    FrameScope(const FrameScope&)            = delete;
-    FrameScope& operator=(const FrameScope&) = delete;
-    FrameScope(FrameScope&&)                 = delete;
-    FrameScope& operator=(FrameScope&&)      = delete;
-
-   private:
-    ScriptComponent::Host* host;
-};
 
 // Runs the file and returns the one class in it that derives from neuronide.Script.
 py::object loadScriptClass(const std::filesystem::path& scriptPath, const std::string& where) {
@@ -208,12 +179,12 @@ PYBIND11_EMBEDDED_MODULE(neuronide, module) {
             "obj", [](const ScriptBase& self) { return ObjectRef(self.attached().owner); },
             "The scene object this script is on.")
         .def_property_readonly(
-            "scene", [](const ScriptBase& self) { return SceneRef(*self.attached().scene); },
+            "scene", [](const ScriptBase& self) { return SceneRef(self.attached().scene); },
             "The whole scene.")
         .def(
             "emit_marker",
             [](const ScriptBase& self, std::string name) {
-                self.attached().emitMarker(std::move(name));
+                SceneRef(self.attached().scene).get()->emitMarker(std::move(name));
             },
             py::arg("name"),
             "Records a marker, stamped with the time the current frame appears on screen. "
@@ -258,7 +229,7 @@ ScriptComponent::~ScriptComponent() {
 }
 
 void ScriptComponent::onSceneReady(Scene& scene) {
-    host->scene = &scene;
+    host->scene = scene.weak_from_this();
     host->base->attach(host.get());
     if (!host->onStart.is_none()) {
         host->call(host->onStart, "on_start");
@@ -266,12 +237,9 @@ void ScriptComponent::onSceneReady(Scene& scene) {
 }
 
 void ScriptComponent::update(const Context& context) {
-    host->flushHeldMarkers(context);
-    if (host->onUpdate.is_none()) {
-        return;
+    if (!host->onUpdate.is_none()) {
+        host->call(host->onUpdate, "on_update", context.timestamp);
     }
-    const FrameScope frame(*host, context);
-    host->call(host->onUpdate, "on_update", context.timestamp);
 }
 
 void ScriptComponent::render(SDL_Renderer* renderer) { (void)renderer; }
