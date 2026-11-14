@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "data_structures/Context.hpp"
+#include "events/MarkerEventLink.hpp"
+#include "events/Subscription.hpp"
+#include "scene/Scene.hpp"
 #include "scene/SceneObject.hpp"
 #include "scene/components/BlinkComponent.hpp"
 #include "scene/components/Component.hpp"
@@ -45,6 +51,62 @@ SpyComponent* addSpy(const std::shared_ptr<SceneObject>& object, bool allowDrawi
     object->addComponent(std::move(spy));
     return raw;
 }
+
+using Markers = std::vector<std::string>;
+
+// Turns one of an object's events into the marker "<object> <event>" while it lives.
+class EventMarker {
+   public:
+    EventMarker(SceneObject& object, std::string_view event)
+        : link(object.name + " " + std::string(event)),
+          subscription(object.getEvent(event)->subscribe(&link)) {}
+
+   private:
+    MarkerEventLink link;
+    Subscription    subscription;
+};
+
+// Sets another object's isActive on every update. The scene keeps both objects alive.
+class SwitchComponent : public Component {
+   public:
+    SwitchComponent(const std::shared_ptr<SceneObject>& owner, SceneObject& target, bool active)
+        : Component(owner), target(&target), active(active) {}
+
+    void update(const Context& context) override {
+        (void)context;
+        target->isActive = active;
+    }
+    void render(SDL_Renderer* renderer) override { (void)renderer; }
+
+   private:
+    SceneObject* target;
+    bool         active;
+};
+
+// Runs one frame of `scene` and returns its markers.
+Markers frame(Scene& scene) {
+    Markers markers;
+    scene.update(Context{kStep, &markers});
+    return markers;
+}
+
+// An object called "Obj" whose activate and deactivate events become markers.
+class SceneObjectEventsTest : public ::testing::Test {
+   protected:
+    SceneObject& object() { return obj; }
+
+    // Dispatches the object's change since the last dispatch and returns the events it fired.
+    Markers dispatch() {
+        Markers markers;
+        obj.dispatchActivateStatusChange(Context{kStep, &markers});
+        return markers;
+    }
+
+   private:
+    SceneObject obj{"Obj"};
+    EventMarker activated{obj, "activate"};
+    EventMarker deactivated{obj, "deactivate"};
+};
 }  // namespace
 
 TEST(SceneObjectTest, RendersComponentsWhenAllAllowDrawing) {
@@ -122,4 +184,82 @@ TEST(SceneObjectTest, ReactivatedObjectUpdatesAndRendersAgain) {
 
     EXPECT_EQ(spy->updates(), 1);
     EXPECT_EQ(spy->renders(), 1);
+}
+
+TEST(SceneObjectTest, HasOnlyTheActivateAndDeactivateEvents) {
+    SceneObject object("Obj");
+
+    EXPECT_NE(object.getEvent("activate"), nullptr);
+    EXPECT_NE(object.getEvent("deactivate"), nullptr);
+    EXPECT_NE(object.getEvent("activate"), object.getEvent("deactivate"));
+    EXPECT_EQ(object.getEvent("appear"), nullptr);
+}
+
+// Nothing is on screen before the first frame, so an object shown in it has just been activated.
+TEST_F(SceneObjectEventsTest, FiresActivateInTheFirstFrameForAnObjectActiveFromTheStart) {
+    EXPECT_EQ(dispatch(), Markers{"Obj activate"});
+}
+
+TEST_F(SceneObjectEventsTest, FiresNothingInTheFirstFrameForAnObjectInactiveFromTheStart) {
+    object().isActive = false;
+
+    EXPECT_TRUE(dispatch().empty());
+}
+
+TEST_F(SceneObjectEventsTest, FiresDeactivateWhenTheObjectIsDeactivated) {
+    dispatch();
+    object().isActive = false;
+
+    EXPECT_EQ(dispatch(), Markers{"Obj deactivate"});
+}
+
+TEST_F(SceneObjectEventsTest, FiresActivateWhenTheObjectIsActivatedAgain) {
+    dispatch();
+    object().isActive = false;
+    dispatch();
+    object().isActive = true;
+
+    EXPECT_EQ(dispatch(), Markers{"Obj activate"});
+}
+
+TEST_F(SceneObjectEventsTest, FiresEachChangeOnce) {
+    dispatch();
+
+    EXPECT_TRUE(dispatch().empty());
+}
+
+// The screen never showed the object hidden, so there is nothing to mark.
+TEST_F(SceneObjectEventsTest, FiresNothingForAChangeUndoneBeforeTheDispatch) {
+    dispatch();
+    object().isActive = false;
+    object().isActive = true;
+
+    EXPECT_TRUE(dispatch().empty());
+}
+
+// Events fire after every object is updated, so a change made by an object later in the scene
+// still goes with the frame that first shows it.
+TEST(SceneUpdateTest, FiresAChangeMadeLaterInTheFrameInThatFrame) {
+    const auto scene      = std::make_shared<Scene>();
+    const auto stimulus   = std::make_shared<SceneObject>("Stimulus", false);
+    const auto experiment = std::make_shared<SceneObject>("Experiment");
+    experiment->addComponent(std::make_unique<SwitchComponent>(experiment, *stimulus, true));
+    scene->addObject(stimulus);
+    scene->addObject(experiment);
+    const EventMarker activated(*stimulus, "activate");
+
+    EXPECT_EQ(frame(*scene), Markers{"Stimulus activate"});
+}
+
+// An inactive object is not updated, but its deactivation still has to fire.
+TEST(SceneUpdateTest, FiresDeactivateForAnObjectNoLongerUpdated) {
+    const auto scene    = std::make_shared<Scene>();
+    const auto stimulus = std::make_shared<SceneObject>("Stimulus");
+    scene->addObject(stimulus);
+    const EventMarker deactivated(*stimulus, "deactivate");
+    frame(*scene);
+
+    stimulus->isActive = false;
+
+    EXPECT_EQ(frame(*scene), Markers{"Stimulus deactivate"});
 }

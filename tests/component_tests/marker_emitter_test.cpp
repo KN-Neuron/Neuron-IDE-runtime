@@ -3,15 +3,18 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "data_structures/Context.hpp"
 #include "events/Delegate.hpp"
 #include "events/MarkerEventLink.hpp"
+#include "neuronide.pb.h"
 #include "scene/Scene.hpp"
 #include "scene/SceneObject.hpp"
 #include "scene/components/Component.hpp"
 #include "scene/components/MarkerEmitterComponent.hpp"
+#include "utils/ParserTestUtils.hpp"
 
 // -------------------------------------------------------------------
 // Mock event listener for delegate tests
@@ -159,6 +162,15 @@ TEST(ResolveEventsTest, ThrowsOnMissingEvent) {
     EXPECT_THROW(scene->resolveEvents("Provider", "no_such_event"), std::runtime_error);
 }
 
+TEST(ResolveEventsTest, ReturnsTheObjectsOwnEvents) {
+    auto scene = std::make_shared<Scene>();
+    auto obj   = std::make_shared<SceneObject>("Stimulus");
+    scene->addObject(obj);
+
+    EXPECT_EQ(&scene->resolveEvents("Stimulus", "activate"), obj->getEvent("activate"));
+    EXPECT_EQ(&scene->resolveEvents("Stimulus", "deactivate"), obj->getEvent("deactivate"));
+}
+
 // ===================================================================
 // MarkerEmitterComponent integration test
 // ===================================================================
@@ -189,4 +201,39 @@ TEST(MarkerEmitterIntegration, FullFlow) {
 
     ASSERT_EQ(markers.size(), 1);
     EXPECT_EQ(markers[0], "hello_world");
+}
+
+// Bindings are resolved while the file is parsed, so this also checks they can name object events.
+TEST(MarkerEmitterIntegration, MarksAnObjectActivatingAndDeactivating) {
+    NeuronIDE::Scene proto;
+    proto.set_project_name("Markers");
+    auto* stimulus = proto.add_scene_objects();
+    stimulus->set_name("Stimulus");
+    stimulus->set_is_visible(false);
+    auto* emitter = proto.add_scene_objects();
+    emitter->set_name("Emitter");
+    emitter->set_is_visible(true);
+    auto* bindings = emitter->add_components()->mutable_marker_emitter();
+    for (const auto& [event, marker] :
+         {std::pair{"activate", "stimulus_on"}, std::pair{"deactivate", "stimulus_off"}}) {
+        auto* binding = bindings->add_bindings();
+        binding->set_target_object("Stimulus");
+        binding->set_target_event(event);
+        binding->set_marker_name(marker);
+    }
+
+    const auto scene  = utils::parseProtoScene(proto);
+    const auto object = scene->findObject("Stimulus");
+    const auto frame  = [&scene] {
+        std::vector<std::string> markers;
+        scene->update(Context{0.0, &markers});
+        return markers;
+    };
+
+    EXPECT_TRUE(frame().empty());
+    object->isActive = true;
+    EXPECT_EQ(frame(), std::vector<std::string>{"stimulus_on"});
+    EXPECT_TRUE(frame().empty());
+    object->isActive = false;
+    EXPECT_EQ(frame(), std::vector<std::string>{"stimulus_off"});
 }
