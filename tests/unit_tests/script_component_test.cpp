@@ -12,6 +12,8 @@
 #include <vector>
 
 #include "data_structures/Context.hpp"
+#include "events/MarkerEventLink.hpp"
+#include "events/Subscription.hpp"
 #include "neuronide.pb.h"
 #include "parser/Parser.hpp"
 #include "scene/Scene.hpp"
@@ -194,6 +196,28 @@ class Trial(neuronide.Script):
     EXPECT_FALSE(target->isActive);
     frame(*scene);
     EXPECT_TRUE(target->isActive);
+}
+
+// The script hides "Plain" in the first frame, before it is ever drawn, so that frame fires
+// nothing.
+TEST_F(ScriptComponentTest, ObjectsItShowsAndHidesFireTheirEventsInTheSameFrame) {
+    const auto      scene = load(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_update(self, dt):
+        plain = self.scene.find("Plain")
+        plain.active = not plain.active
+)");
+    const auto      plain = scene->findObject("Plain");
+    MarkerEventLink shown("shown");
+    MarkerEventLink hidden("hidden");
+    const auto      showing = plain->getEvent("activate")->subscribe(&shown);
+    const auto      hiding  = plain->getEvent("deactivate")->subscribe(&hidden);
+
+    EXPECT_TRUE(frame(*scene).empty());
+    EXPECT_EQ(frame(*scene), (std::vector<std::string>{"shown"}));
+    EXPECT_EQ(frame(*scene), (std::vector<std::string>{"hidden"}));
 }
 
 TEST_F(ScriptComponentTest, ChangesText) {
