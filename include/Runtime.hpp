@@ -7,6 +7,7 @@
 #include <config/DeviceConfig.hpp>
 #include <functional>
 #include <memory>
+#include <scripting/PythonInterpreter.hpp>
 #include <stop_token>
 #include <string>
 #include <thread>
@@ -113,6 +114,10 @@ class Runtime {
     SdlSession sdlSession;
 
     std::shared_ptr<SDL_Renderer> sdlRenderer;
+
+    // Declared before scene: scripts run while it is parsed, and their Python objects must go
+    // before the interpreter does.
+    PythonInterpreter python;
 
     std::shared_ptr<Scene>                                scene;
     std::shared_ptr<moodycamel::ConcurrentQueue<EEGData>> eegQueue;

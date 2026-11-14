@@ -42,13 +42,13 @@ EEG samples and the stimulus markers must share a **common clock domain** so tha
 | Rendering / windowing    | SDL2 + SDL2_image + SDL2_ttf (2.20 or newer), with vsync               |
 | Inter-thread queues      | [moodycamel ConcurrentQueue](https://github.com/cameron314/concurrentqueue) (lock-free) |
 | Logging                  | [Quill](https://github.com/odygrd/quill) (asynchronous), to stderr — see §3 |
-| Python scripting (planned)| pybind11 (`ScriptComponent`)                                          |
+| Python scripting         | Embedded Python 3 (3.9 or newer; the lab PCs' version is not decided) via [pybind11](https://github.com/pybind/pybind11) (`ScriptComponent`) |
 | Testing                  | GoogleTest + CTest                                                     |
 | Tooling                  | clang-format, clang-tidy, gcovr (coverage)                             |
 
-`liblsl`, `concurrentqueue`, `nlohmann/json`, `quill`, and `googletest` are fetched
-automatically by CMake (`FetchContent`). SDL2 and Protobuf are expected to be
-installed on the system.
+`liblsl`, `concurrentqueue`, `nlohmann/json`, `quill`, `pybind11`, and `googletest` are
+fetched automatically by CMake (`FetchContent`). SDL2, Protobuf and Python (with its
+development files) are expected to be installed on the system.
 
 ## 3. Architecture
 
@@ -213,6 +213,9 @@ writes it, so the render and acquisition threads never wait on I/O to log.
   to SDL, which turns them into `SDL_QUIT`, so a stopped run still closes its recording.
 - Nothing is logged per frame or per sample. Either log an error or throw it, not
   both — except on a worker thread, where the log records *when* it failed.
+- Python scripts log too: each line they `print()` is an `INFO` line under `[script]`,
+  and each line they write to `sys.stderr` a `WARNING`. When Python starts, the runtime
+  seeds its `random` module afresh and logs the seed, so a run's draws can be repeated.
 
 ## 4. Clock synchronization (critical)
 
@@ -414,7 +417,7 @@ correct when `SDL_RenderPresent` waits for the refresh.
 | `Scene` / `SceneObject`     | Implemented   | component containers                                          |
 | `Component` (base)          | Implemented   | abstract `update` / `render`                                 |
 | `ComponentRegistry`         | Implemented   | proto-type → factory, macro-based self-registration          |
-| Scene components            | **Partial**   | 3 of the 9 MVP components have a C++ class, see [Components](#components) |
+| Scene components            | **Partial**   | 5 of the 9 MVP components have a C++ class, see [Components](#components) |
 | `Renderer`                  | Implemented   | SDL + vsync, marker timestamping                             |
 | `LSLReader`                 | Implemented   | LSL inlet → `eegQueue`, clock-synced (see §4); driven by `DeviceConfig`, enabled channels only, re-resolves lost streams, reports `AcquisitionState` |
 | `ConfigParser`              | Implemented   | `config.json` → `DeviceConfig` (1:1 mapping, major-version checked, see §5), nlohmann/json |
@@ -422,6 +425,7 @@ correct when `SDL_RenderPresent` waits for the refresh.
 | `DataWriter`                | Implemented   | strategy-based; `CSVFormatStrategy`                          |
 | `DataFormatStrategyFactory` | Implemented   | `output.format` → format strategy; unknown formats rejected  |
 | Logging                     | Implemented   | Quill, one logger per subsystem, stderr (see §3) |
+| `PythonInterpreter`         | Implemented   | embedded Python for `ScriptComponent`, owned by `Runtime` and declared before the scene; seeds `random` and logs the seed; `print()` and `sys.stderr` go to the log (see §3) |
 | `Runtime` orchestration     | Implemented   | owns SDL session, parses both config files, gates the experiment on live EEG, records to a fresh file, drives the render loop, stops workers (see §6) |
 
 The class diagram in older docs is partly aspirational; the table above reflects
@@ -442,7 +446,7 @@ Update the row in the same PR that changes it.
 | MarkerEmitter | Emits an LSL marker on a scene event, ideally when an object appears or disappears. | `MarkerEmitterComponent` (`marker_emitter = 5`). Missing from the backend's copy | `MarkerEmitterComponent`, registered | **Implemented, nothing to bind to**: bindings resolve and push markers (tested against a test-only event source), but no production component exposes an event and objects have no appear/disappear events, so any binding in a real `.neuroz` fails at parse time | [backend#23][be-23] |
 | Lifetime | Keeps the object visible for N ms, then hides it. | — | — | **Not started** | — |
 | ResponseListener | While its object is active, records which key was pressed and the reaction time. | — | — | **Not started** | — |
-| ScriptComponent | Custom logic in Python, outside the standard components. | `ScriptComponent` (`script = 4`) | — | **Planned**: needs pybind11, which is not a dependency yet | [backend#25][be-25] |
+| ScriptComponent | Custom logic in Python, outside the standard components. | `ScriptComponent` (`script = 4`), `script_path` | `ScriptComponent`, registered | **Partial**: one script per object. The file defines exactly one `neuronide.Script` subclass, with optional hooks `on_start()` (once, while the scene is parsed: before the EEG wait and the recording) and `on_update(dt)` (every frame while its object is active). A script finds objects (`self.scene.find`), shows and hides them (`obj.active`), changes their text (`obj.text`) and emits markers stamped with the flip of the current frame (`self.emit_marker`); markers from `on_start` go with the first frame. Its parameters (trial counts, timings) live in the script, not in the proto. A script that does not load, or raises in `on_start`, stops the run before the window opens; an exception in `on_update` stops the experiment. Not yet: key input ([#43][rt-43]), subscribing to events ([#42][rt-42]), ending the experiment, its own exit code ([#37][rt-37]) | [#44][rt-44], [backend#25][be-25] |
 | AudioSource | Plays a sound. Possibly post-MVP. | — | — | **Not started** | — |
 
 - **Implemented**: registered class, behaviour complete, covered by tests.
@@ -491,6 +495,10 @@ Update the row in the same PR that changes it.
 [rt-17]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/17
 [rt-18]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/18
 [rt-34]: https://github.com/KN-Neuron/Neuron-IDE-runtime/pull/34
+[rt-37]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/37
+[rt-42]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/42
+[rt-43]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/43
+[rt-44]: https://github.com/KN-Neuron/Neuron-IDE-runtime/issues/44
 [be-23]: https://github.com/KN-Neuron/Neuron-IDE-backend/issues/23
 [be-25]: https://github.com/KN-Neuron/Neuron-IDE-backend/issues/25
 
@@ -515,6 +523,7 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
   │   ├── lslreader/        # LSLReader
   │   ├── datawriter/       # DataWriter, IDataFormatStrategy, CSVFormatStrategy
   │   ├── logging/          # subsystem loggers + logging Session (Quill)
+  │   ├── scripting/        # PythonInterpreter (embedded Python for ScriptComponent)
   │   └── Runtime.hpp
   ├── src/                  # one CMake subdirectory (static lib) per module
   └── tests/
@@ -538,8 +547,8 @@ On Ubuntu 24.04, the release CI runs on (see [`ci/Dockerfile`](ci/Dockerfile)):
 
 ```bash
 sudo apt update
-sudo apt install cmake ninja-build clang-format-20 clang-tidy-20 libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev protobuf-compiler gcovr
-# GTest, LSL, concurrentqueue, nlohmann/json and Quill are fetched automatically by CMake.
+sudo apt install cmake ninja-build clang-format-20 clang-tidy-20 libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev protobuf-compiler python3-dev gcovr
+# GTest, LSL, concurrentqueue, nlohmann/json, Quill and pybind11 are fetched automatically by CMake.
 ```
 
 ### Running CI locally

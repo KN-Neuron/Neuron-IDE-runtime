@@ -34,6 +34,17 @@ class SceneObject {
 
     void addComponent(std::unique_ptr<Component> comp);
 
+    // The first component of type T, or null.
+    template <typename T>
+    [[nodiscard]] T* findComponent() const {
+        for (const auto& comp : components) {
+            if (auto* found = dynamic_cast<T*>(comp.get())) {
+                return found;
+            }
+        }
+        return nullptr;
+    }
+
     void update(const Context& ctx);
     void render(SDL_Renderer* renderer);
 };
