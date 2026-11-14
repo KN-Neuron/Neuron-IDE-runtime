@@ -1,14 +1,51 @@
 #include "scene/Scene.hpp"
 
 #include <stdexcept>
+#include <utility>
 
+#include "data_structures/Context.hpp"
 #include "events/Delegate.hpp"
 #include "scene/SceneObject.hpp"
 #include "scene/components/Component.hpp"
 
+namespace {
+
+// Points `current` at the frame being updated for as long as it lives.
+class FrameScope {
+   public:
+    FrameScope(const Context*& current, const Context& frame) : current(&current) {
+        current = &frame;
+    }
+    ~FrameScope() { *current = nullptr; }
+
+    FrameScope(const FrameScope&)            = delete;
+    FrameScope& operator=(const FrameScope&) = delete;
+    FrameScope(FrameScope&&)                 = delete;
+    FrameScope& operator=(FrameScope&&)      = delete;
+
+   private:
+    const Context** current;
+};
+
+}  // namespace
+
 void Scene::update(const Context& ctx) {
+    if (ctx.markers != nullptr) {
+        ctx.markers->insert(ctx.markers->end(), heldMarkers.begin(), heldMarkers.end());
+    }
+    heldMarkers.clear();
+
+    const FrameScope scope(frame, ctx);
     for (const auto& obj : objects) {
         obj->update(ctx);
+    }
+}
+
+void Scene::emitMarker(std::string name) {
+    if (frame == nullptr) {
+        heldMarkers.push_back(std::move(name));
+    } else if (frame->markers != nullptr) {
+        frame->markers->push_back(std::move(name));
     }
 }
 

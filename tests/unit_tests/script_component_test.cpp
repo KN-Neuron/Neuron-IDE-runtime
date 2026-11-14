@@ -123,6 +123,20 @@ class Trial(neuronide.Script):
     EXPECT_EQ(frame(*scene), (std::vector<std::string>{"updated"}));
 }
 
+TEST_F(ScriptComponentTest, SendsMarkersFromOnStartWithTheFirstFrameEvenIfItsObjectIsInactive) {
+    const auto scene = load(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.emit_marker("started")
+        self.obj.active = False
+)");
+
+    EXPECT_EQ(frame(*scene), (std::vector<std::string>{"started"}));
+    EXPECT_TRUE(frame(*scene).empty());
+}
+
 TEST_F(ScriptComponentTest, RunsOnStartWhileTheSceneIsParsed) {
     const auto scene = load(R"(
 import neuronide
@@ -356,8 +370,8 @@ TEST_F(ScriptComponentTest, RejectsANullOwner) {
     EXPECT_THROW(ScriptComponent(nullptr, "script.py"), std::invalid_argument);
 }
 
-// A script can keep itself, or an object, past the end of the scene; using either then raises in
-// Python instead of reaching freed memory.
+// A script can keep itself, an object or the scene past the end of the scene; using any of them
+// then raises in Python instead of reaching freed memory.
 TEST_F(ScriptComponentTest, ScriptsKeptPastTheSceneCanNoLongerReachIt) {
     auto scene = load(R"(
 import builtins
@@ -367,13 +381,18 @@ class Trial(neuronide.Script):
     def on_start(self):
         builtins.kept_script = self
         builtins.kept_target = self.scene.find("Target")
+        builtins.kept_scene = self.scene
 )");
     scene.reset();
 
     const std::string scriptError = pythonErrorOf("kept_script.obj");
     const std::string targetError = pythonErrorOf("kept_target.name");
-    py::exec("import builtins\ndel builtins.kept_script\ndel builtins.kept_target");
+    const std::string sceneError  = pythonErrorOf("kept_scene.find('Target')");
+    py::exec(
+        "import builtins\ndel builtins.kept_script\ndel builtins.kept_target\n"
+        "del builtins.kept_scene");
 
     EXPECT_TRUE(contains(scriptError, "not attached to a scene object")) << scriptError;
     EXPECT_TRUE(contains(targetError, "no longer exists")) << targetError;
+    EXPECT_TRUE(contains(sceneError, "the scene no longer exists")) << sceneError;
 }
