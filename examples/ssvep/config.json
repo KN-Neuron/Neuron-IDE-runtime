@@ -1,0 +1,24 @@
+{
+  "config_version": "1.0",
+  "device_name": "Fake 8-channel EEG (lsl_testing/outlet)",
+  "montage_standard": "10-20",
+  "lsl_stream": {
+    "name": "obci_eeg1",
+    "type": "EEG",
+    "source_id": "cyton-a1b2c3",
+    "expected_channel_count": 8,
+    "expected_sample_rate_hz": 250
+  },
+  "channels": [
+    { "index": 0, "label": "PO7", "enabled": true, "unit": "microvolts" },
+    { "index": 1, "label": "PO3", "enabled": true, "unit": "microvolts" },
+    { "index": 2, "label": "POz", "enabled": true, "unit": "microvolts" },
+    { "index": 3, "label": "PO4", "enabled": true, "unit": "microvolts" },
+    { "index": 4, "label": "PO8", "enabled": true, "unit": "microvolts" },
+    { "index": 5, "label": "O1", "enabled": true, "unit": "microvolts" },
+    { "index": 6, "label": "Oz", "enabled": true, "unit": "microvolts" },
+    { "index": 7, "label": "O2", "enabled": true, "unit": "microvolts" }
+  ],
+  "display": { "index": 0, "fullscreen": false, "width": 1280, "height": 720 },
+  "output": { "format": "csv" }
+}

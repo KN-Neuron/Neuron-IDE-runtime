@@ -64,3 +64,5 @@ Thumbs.db
 
 # config files
 *.json
+# ...except the device configs examples run with
+!examples/*/config.json

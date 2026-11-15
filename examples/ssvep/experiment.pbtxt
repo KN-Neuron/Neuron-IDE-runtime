@@ -1,0 +1,113 @@
+# Laid out for a 1280x720 window. Objects are drawn in this order, so later ones end up on top.
+#
+# Each target is two objects at the same place: TargetN stands still, FlickerN blinks. ssvep.py
+# shows one or the other, so the targets only flicker during a trial. ArrowN is the cue above
+# target N.
+project_name: "ssvep"
+
+# First, so the objects it shows or hides in a frame are updated in that same frame.
+scene_objects {
+  name: "Trials"
+  is_visible: true
+  components { script { script_path: "ssvep.py" } }
+}
+
+scene_objects {
+  name: "Instructions"
+  is_visible: true
+  transform { x: 90 y: 500 width: 1100 height: 160 }
+  components {
+    text {
+      text: "Patrz na kwadrat wskazany czerwoną strzałką.\nGdy kwadraty migają, staraj się nie mrugać i nie ruszać."
+      font_size: 30
+    }
+  }
+}
+
+scene_objects {
+  name: "Thanks"
+  is_visible: false
+  transform { x: 140 y: 300 width: 1000 height: 120 }
+  components { text { text: "Koniec. Dziękujemy!" font_size: 48 } }
+}
+
+scene_objects {
+  name: "Target1"
+  is_visible: true
+  transform { x: 80 y: 280 width: 160 height: 160 }
+  components { renderer { img_path: "target.png" } }
+}
+scene_objects {
+  name: "Target2"
+  is_visible: true
+  transform { x: 400 y: 280 width: 160 height: 160 }
+  components { renderer { img_path: "target.png" } }
+}
+scene_objects {
+  name: "Target3"
+  is_visible: true
+  transform { x: 720 y: 280 width: 160 height: 160 }
+  components { renderer { img_path: "target.png" } }
+}
+scene_objects {
+  name: "Target4"
+  is_visible: true
+  transform { x: 1040 y: 280 width: 160 height: 160 }
+  components { renderer { img_path: "target.png" } }
+}
+
+# Every period is a whole number of frames at both 60 and 120 Hz (60 Hz: 8, 7, 6 and 5 frames).
+# ssvep.py repeats these frequencies in its markers, so change them there too.
+scene_objects {
+  name: "Flicker1"
+  is_visible: false
+  transform { x: 80 y: 280 width: 160 height: 160 }
+  components { renderer { img_path: "target.png" } }
+  components { blinker { blink_frequency_hz: 7.5 } }
+}
+scene_objects {
+  name: "Flicker2"
+  is_visible: false
+  transform { x: 400 y: 280 width: 160 height: 160 }
+  components { renderer { img_path: "target.png" } }
+  components { blinker { blink_frequency_hz: 8.571428571428571 } }
+}
+scene_objects {
+  name: "Flicker3"
+  is_visible: false
+  transform { x: 720 y: 280 width: 160 height: 160 }
+  components { renderer { img_path: "target.png" } }
+  components { blinker { blink_frequency_hz: 10 } }
+}
+scene_objects {
+  name: "Flicker4"
+  is_visible: false
+  transform { x: 1040 y: 280 width: 160 height: 160 }
+  components { renderer { img_path: "target.png" } }
+  components { blinker { blink_frequency_hz: 12 } }
+}
+
+scene_objects {
+  name: "Arrow1"
+  is_visible: false
+  transform { x: 120 y: 160 width: 80 height: 100 }
+  components { renderer { img_path: "arrow.png" } }
+}
+scene_objects {
+  name: "Arrow2"
+  is_visible: false
+  transform { x: 440 y: 160 width: 80 height: 100 }
+  components { renderer { img_path: "arrow.png" } }
+}
+scene_objects {
+  name: "Arrow3"
+  is_visible: false
+  transform { x: 760 y: 160 width: 80 height: 100 }
+  components { renderer { img_path: "arrow.png" } }
+}
+scene_objects {
+  name: "Arrow4"
+  is_visible: false
+  transform { x: 1080 y: 160 width: 80 height: 100 }
+  components { renderer { img_path: "arrow.png" } }
+}
