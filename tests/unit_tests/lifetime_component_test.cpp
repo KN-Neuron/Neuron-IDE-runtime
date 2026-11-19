@@ -314,3 +314,60 @@ TEST(LifetimeComponentEventTest, DoesNotFireExpireWhenSomethingElseHidesTheObjec
 
     EXPECT_EQ(markers, (std::vector<std::string>{"cue_hidden"}));
 }
+
+// When something else hides the object before the time is up, the countdown is dropped. Activated
+// again, the object gets the full duration, not what was left over. The object's "deactivate" is
+// what drops it, and the scene fires that at the end of the frame in which isActive changed.
+TEST(LifetimeComponentCountdownTest, IsDroppedWhenSomethingElseHidesTheObject) {
+    auto              owner = std::make_shared<SceneObject>("Cue");
+    LifetimeComponent lifetime(owner, kHalfSecondMs);
+    const Context     frame{kQuarterSecond, nullptr};
+    owner->dispatchActivateStatusChange(frame);
+
+    lifetime.update(frame);
+    owner->isActive = false;
+    owner->dispatchActivateStatusChange(frame);
+    owner->isActive = true;
+    owner->dispatchActivateStatusChange(frame);
+
+    lifetime.update(frame);
+    EXPECT_TRUE(owner->isActive);
+
+    lifetime.update(frame);
+    EXPECT_FALSE(owner->isActive);
+}
+
+// The same through a scene, with markers: after the early hide and the re-activation the first
+// frame does not expire, and the frame in which the full duration has passed does.
+TEST(LifetimeComponentCountdownTest, StartsOverForAnObjectActivatedAfterAnEarlyHide) {
+    const auto scene = utils::parseProtoScene(sceneWithMarkersOnTheCue(kHalfSecondMs));
+    const auto cue   = scene->getObjects().at(0);
+    std::vector<std::string> markers;
+
+    scene->update(Context{kQuarterSecond, &markers});
+    cue->isActive = false;
+    scene->update(Context{kQuarterSecond, &markers});
+    cue->isActive = true;
+    markers.clear();
+
+    scene->update(Context{kQuarterSecond, &markers});
+    EXPECT_TRUE(markers.empty());
+
+    scene->update(Context{kQuarterSecond, &markers});
+    std::ranges::sort(markers);
+    EXPECT_EQ(markers, (std::vector<std::string>{"cue_expired", "cue_hidden"}));
+}
+
+// The subscription to the owner is released with the component, so the owner can go on firing its
+// events afterwards.
+TEST(LifetimeComponentCountdownTest, StopsListeningWhenTheComponentIsGone) {
+    auto          owner = std::make_shared<SceneObject>("Cue");
+    const Context frame{kQuarterSecond, nullptr};
+    owner->dispatchActivateStatusChange(frame);
+    {
+        const LifetimeComponent lifetime(owner, kHalfSecondMs);
+    }
+
+    owner->isActive = false;
+    EXPECT_NO_THROW(owner->dispatchActivateStatusChange(frame));
+}

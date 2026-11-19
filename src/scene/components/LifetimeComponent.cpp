@@ -26,6 +26,7 @@ LifetimeComponent::LifetimeComponent(const std::shared_ptr<SceneObject>& owner,
             "LifetimeComponent on '" + owner->name + "': duration_ms must be between 1 and " +
             std::to_string(kMaxDurationMs) + ", got " + std::to_string(milliseconds));
     }
+    deactivateSubscription.emplace(owner->getEvent("deactivate")->subscribe(&dropCountdown));
     LOG_DEBUG(logger(), "LifetimeComponent on '{}' hides its object after {} ms", owner->name,
               milliseconds);
 }
