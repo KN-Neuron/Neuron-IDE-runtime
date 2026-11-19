@@ -1,11 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "data_structures/Context.hpp"
+#include "events/EventListener.hpp"
 #include "neuronide.pb.h"
 #include "scene/Scene.hpp"
 #include "scene/SceneObject.hpp"
@@ -51,6 +54,39 @@ NeuronIDE::Scene sceneWithLifetime(std::uint32_t durationMs) {
     object->add_components()->mutable_lifetime()->set_duration_ms(durationMs);
     return scene;
 }
+
+// The scene above plus an object "Markers" that emits "cue_expired" on the cue's "expire" and
+// "cue_hidden" on its "deactivate".
+NeuronIDE::Scene sceneWithMarkersOnTheCue(std::uint32_t durationMs) {
+    NeuronIDE::Scene scene        = sceneWithLifetime(durationMs);
+    auto*            markerObject = scene.add_scene_objects();
+    markerObject->set_name("Markers");
+    markerObject->set_is_visible(true);
+    auto* emitter  = markerObject->add_components()->mutable_marker_emitter();
+    auto* onExpire = emitter->add_bindings();
+    onExpire->set_target_object("Cue");
+    onExpire->set_target_event("expire");
+    onExpire->set_marker_name("cue_expired");
+    auto* onHide = emitter->add_bindings();
+    onHide->set_target_object("Cue");
+    onHide->set_target_event("deactivate");
+    onHide->set_marker_name("cue_hidden");
+    return scene;
+}
+
+// Counts how often the event it is subscribed to fires.
+class CountingListener : public EventListener {
+   public:
+    void onEventTriggered(const Context& context) override {
+        (void)context;
+        ++count;
+    }
+
+    [[nodiscard]] int triggered() const { return count; }
+
+   private:
+    int count = 0;
+};
 }  // namespace
 
 TEST(LifetimeComponentTest, KeepsTheDuration) {
@@ -210,4 +246,71 @@ TEST(LifetimeComponentParseTest, RejectsALifetimeWithoutADuration) {
     scene.mutable_scene_objects(0)->mutable_components(0)->mutable_lifetime()->clear_duration_ms();
 
     EXPECT_THROW(utils::parseProtoScene(scene), std::invalid_argument);
+}
+
+// "expire" is the only event Lifetime has. "deactivate" belongs to the object itself.
+TEST(LifetimeComponentEventTest, ExposesOnlyTheExpireEvent) {
+    auto              owner = std::make_shared<SceneObject>("Cue");
+    LifetimeComponent lifetime(owner, kHalfSecondMs);
+
+    EXPECT_NE(lifetime.getEvent("expire"), nullptr);
+    EXPECT_EQ(lifetime.getEvent("deactivate"), nullptr);
+    EXPECT_EQ(lifetime.getEvent("anything else"), nullptr);
+}
+
+TEST(LifetimeComponentEventTest, FiresExpireInTheFrameItHidesTheObject) {
+    auto              owner = std::make_shared<SceneObject>("Cue");
+    LifetimeComponent lifetime(owner, kHalfSecondMs);
+    CountingListener  listener;
+    const auto        subscription = lifetime.getEvent("expire")->subscribe(&listener);
+
+    lifetime.update(Context{kQuarterSecond, nullptr});
+    EXPECT_EQ(listener.triggered(), 0);
+
+    lifetime.update(Context{kQuarterSecond, nullptr});
+    EXPECT_EQ(listener.triggered(), 1);
+}
+
+// Each timeout fires once, and the countdown starts over after it.
+TEST(LifetimeComponentEventTest, FiresOncePerTimeout) {
+    auto              owner = std::make_shared<SceneObject>("Cue");
+    LifetimeComponent lifetime(owner, kHalfSecondMs);
+    CountingListener  listener;
+    const auto        subscription = lifetime.getEvent("expire")->subscribe(&listener);
+
+    lifetime.update(Context{kHalfSecond, nullptr});
+    EXPECT_EQ(listener.triggered(), 1);
+
+    lifetime.update(Context{kQuarterSecond, nullptr});
+    EXPECT_EQ(listener.triggered(), 1);
+
+    lifetime.update(Context{kQuarterSecond, nullptr});
+    EXPECT_EQ(listener.triggered(), 2);
+}
+
+// Through a scene: "expire" and the object's own "deactivate" both land in the markers of the frame
+// in which Lifetime hides the object.
+TEST(LifetimeComponentEventTest, MarksATimeoutTogetherWithTheDeactivation) {
+    const auto scene = utils::parseProtoScene(sceneWithMarkersOnTheCue(kHalfSecondMs));
+    std::vector<std::string> markers;
+
+    scene->update(Context{kQuarterSecond, &markers});
+    EXPECT_TRUE(markers.empty());
+
+    scene->update(Context{kQuarterSecond, &markers});
+    std::ranges::sort(markers);
+    EXPECT_EQ(markers, (std::vector<std::string>{"cue_expired", "cue_hidden"}));
+}
+
+// If something else hides the object first, only "deactivate" fires: a marker on "expire" tells a
+// timeout from an early hide.
+TEST(LifetimeComponentEventTest, DoesNotFireExpireWhenSomethingElseHidesTheObjectFirst) {
+    const auto scene = utils::parseProtoScene(sceneWithMarkersOnTheCue(kHalfSecondMs));
+    std::vector<std::string> markers;
+
+    scene->update(Context{kQuarterSecond, &markers});
+    scene->getObjects().at(0)->isActive = false;
+    scene->update(Context{kLongFrame, &markers});
+
+    EXPECT_EQ(markers, (std::vector<std::string>{"cue_hidden"}));
 }

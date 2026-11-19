@@ -43,9 +43,14 @@ void LifetimeComponent::update(const Context& context) {
     elapsedSeconds     = 0.0;
     LOG_DEBUG(logger(), "LifetimeComponent on '{}' hid its object after {} ms", ownerPtr->name,
               duration);
+    expireEvent.invoke(context);
 }
 
 void LifetimeComponent::render(SDL_Renderer* renderer) { (void)renderer; }
+
+Delegate* LifetimeComponent::getEvent(std::string_view eventName) {
+    return eventName == "expire" ? &expireEvent : nullptr;
+}
 
 std::unique_ptr<Component> LifetimeComponent::createLifetime(
     const NeuronIDE::Component& protoComp, const std::shared_ptr<SceneObject>& owner,
