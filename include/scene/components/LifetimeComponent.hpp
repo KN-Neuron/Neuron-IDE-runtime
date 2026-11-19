@@ -13,6 +13,12 @@ class Component;
 }
 
 // Hides its object a set time after the object is activated, e.g. a cue shown for 200 ms.
+//
+// The countdown adds up Context::timestamp, so the object is hidden in the first frame in which
+// the time passed reaches the duration. An object active from the start begins counting in its
+// first frame. Lifetime only ever hides the object, never shows it, and it counts whatever other
+// components do: a blinker on the same object does not pause it. After hiding the object the
+// countdown starts over, so an object that is activated again gets the full duration.
 class LifetimeComponent : public Component {
    public:
     // The longest duration accepted: 24 hours. Anything above is almost certainly a mistake, such
@@ -40,6 +46,7 @@ class LifetimeComponent : public Component {
 
    private:
     std::uint32_t duration;
+    double        elapsedSeconds = 0.0;
 };
 
 #endif  // LIFETIMECOMPONENT_HPP

@@ -4,11 +4,14 @@
 #include <stdexcept>
 #include <string>
 
+#include "data_structures/Context.hpp"
 #include "neuronide.pb.h"
 #include "scene/SceneObject.hpp"
 #include "scene/components/ComponentRegistry.hpp"
 
 namespace {
+constexpr double kMillisecondsPerSecond = 1000.0;
+
 quill::Logger* logger() { return logging::logger(logging::Subsystem::Scene); }
 }  // namespace
 
@@ -27,7 +30,20 @@ LifetimeComponent::LifetimeComponent(const std::shared_ptr<SceneObject>& owner,
               milliseconds);
 }
 
-void LifetimeComponent::update(const Context& context) { (void)context; }
+void LifetimeComponent::update(const Context& context) {
+    const auto ownerPtr = owner.lock();
+    if (!ownerPtr) {
+        return;
+    }
+    elapsedSeconds += context.timestamp;
+    if (elapsedSeconds * kMillisecondsPerSecond < static_cast<double>(duration)) {
+        return;
+    }
+    ownerPtr->isActive = false;
+    elapsedSeconds     = 0.0;
+    LOG_DEBUG(logger(), "LifetimeComponent on '{}' hid its object after {} ms", ownerPtr->name,
+              duration);
+}
 
 void LifetimeComponent::render(SDL_Renderer* renderer) { (void)renderer; }
 
