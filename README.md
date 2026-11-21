@@ -87,7 +87,9 @@ flowchart LR
   so it can timestamp markers at the *actual* moment of screen refresh. Components
   emit marker names during `update`; the Renderer stamps them with
   `lsl::local_clock()` right after `SDL_RenderPresent` and pushes `Marker`s onto
-  `markerQueue`.
+  `markerQueue`. It also reads the keyboard: each frame's key presses reach the
+  components in `Context::keyPresses`, and a marker that already has its own time
+  (a response stamped with its key press) goes onto `markerQueue` with that time.
 - **LSLReader** resolves and subscribes to the EEG LSL stream and continuously
   pushes `EEGData` samples onto `eegQueue`. It forwards **only the channels the
   device config enables** (see [§5 Configuration boundary](#5-configuration-boundary-protobuf-vs-json)),
@@ -182,12 +184,19 @@ struct EEGData {                 // one EEG sample
 
 struct Marker {                  // one experiment event
     std::string eventName;
-    double      timestamp;       // local_clock() at vsync
+    double      timestamp;       // local_clock(): the flip, or its own time (a key press)
+};
+
+struct KeyPress {                // a key going down; auto-repeat is not a new press
+    SDL_Scancode key;            // the physical key, whatever the keyboard layout
+    double       timestamp;      // local_clock(), to within one frame (see §7 open questions)
 };
 
 struct Context {                 // passed to Component::update each frame
-    double                    timestamp;   // per-frame delta time
-    std::vector<std::string>* markers;     // sink: components append marker names here
+    double                    timestamp;     // per-frame delta time
+    std::vector<std::string>* markers;       // sink: marker names, stamped with this frame's flip
+    std::vector<Marker>*      timedMarkers;  // sink: markers that keep their own time
+    std::span<const KeyPress> keyPresses;    // keys pressed since the previous frame, oldest first
 };
 ```
 
@@ -445,7 +454,7 @@ Update the row in the same PR that changes it.
 | BlinkComponent | Flickers the object at a set frequency in Hz. The basis for SSVEP. | `BlinkComponent` (`blinker = 3`) | `BlinkComponent`, registered and built by the parser | **Partial**: `update()` sums the frame deltas into a phase and the component is lit while `sin(2π·f·t) >= 0` (starts lit). The owner is drawn only while every component allows it (`Component::allowsDrawing()`), so the blinker never writes to the owner. `setFrequency()` restarts the cycle. A frequency that is 0, negative or not finite means no blinking (the component stays lit), and the parser warns about it. Not frame-locked yet (see open questions). PR [#34][rt-34] | [#16][rt-16] |
 | MarkerEmitter | Emits an LSL marker on a scene event, ideally when an object appears or disappears. | `MarkerEmitterComponent` (`marker_emitter = 5`). Missing from the backend's copy | `MarkerEmitterComponent`, registered | **Implemented**: binds to an object's `activate` and `deactivate` events, which fire in the first frame the object is active (`SceneObject::isActive`) and in the first frame it is inactive again, so the marker is stamped with the flip that shows or hides it. An object active from the start fires `activate` in the first frame. A blinker's flicker fires neither. No component exposes an event yet, so a binding to any other event fails at parse time | [#42][rt-42], [backend#23][be-23] |
 | Lifetime | Keeps the object visible for N ms, then hides it. | — | — | **Not started** | — |
-| ResponseListener | While its object is active, records which key was pressed and the reaction time. | — | — | **Not started** | — |
+| ResponseListener | While its object is active, records which key was pressed and the reaction time. | — | — | **Not started**. Key presses already reach every component through `Context::keyPresses` (see *Input and reaction time* below) | [#43][rt-43] |
 | ScriptComponent | Custom logic in Python, outside the standard components. | `ScriptComponent` (`script = 4`), `script_path` | `ScriptComponent`, registered | **Partial**: one script per object. The file defines exactly one `neuronide.Script` subclass, with optional hooks `on_start()` (once, while the scene is parsed: before the EEG wait and the recording) and `on_update(dt)` (every frame while its object is active). A script finds objects (`self.scene.find`), shows and hides them (`obj.active`), changes their text (`obj.text`) and emits markers stamped with the flip of the current frame (`self.emit_marker`); markers from `on_start` go with the first frame. Its parameters (trial counts, timings) live in the script, not in the proto. A script that does not load, or raises in `on_start`, stops the run before the window opens; an exception in `on_update` stops the experiment. Not yet: key input ([#43][rt-43]), subscribing to events ([#42][rt-42]), ending the experiment, its own exit code ([#37][rt-37]) | [#44][rt-44], [backend#25][be-25] |
 | AudioSource | Plays a sound. Possibly post-MVP. | — | — | **Not started** | — |
 
@@ -477,12 +486,17 @@ Update the row in the same PR that changes it.
   delta measured at the top of the loop, so it jitters, and a frame near an on/off edge
   can land on either side. Frequencies above half the refresh rate can't be shown at all
   and should be rejected. Dropped frames should be detected and logged.
-- **Input and reaction time.** The render loop polls SDL events itself and handles only
-  `SDL_QUIT`, and `Context` carries no input. ResponseListener needs key events passed
-  in, stamped with when the key was pressed, not with the vsync time the Renderer gives
-  markers. With one poll per frame, reaction-time resolution is one frame (~16.7 ms at
-  60 Hz). One option is to record the response as a marker (e.g. `response:<key>`) with its
-  own timestamp and compute reaction time offline against the onset marker.
+- **Input and reaction time.** The Renderer polls SDL once per frame and hands every key
+  that went down to the components in `Context::keyPresses`, stamped on the LSL clock.
+  SDL stamps an event when it reads it from the OS, which happens in that poll, so a press
+  is known to within one frame (~16.7 ms at 60 Hz). Keys pressed while the runtime waits
+  for the EEG stream never reach the scene. A component records a response with its own
+  time through `Context::timedMarkers`, and reaction time is computed offline against the
+  onset marker. Nothing consumes key presses yet: scripts can't bind keys ([#43][rt-43]),
+  Escape isn't reserved for the operator ([#37][rt-37]) and ResponseListener isn't started.
+  ResponseListener should judge a press by its time, not by `isActive`: a press read in
+  the frame an object becomes active, or in the next one, may predate the flip that shows
+  it, and one made just before the flip that hides it is read after the object is inactive.
 - **Media files.** Sprite, Text (fonts), Script and Audio all reference files by path. The
   runtime resolves relative paths against the `.neuroz` folder (see
   [Component model](#component-model)), but assets can't be uploaded or exported yet

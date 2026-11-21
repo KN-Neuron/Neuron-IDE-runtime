@@ -2,14 +2,18 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <stop_token>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "data_structures/Context.hpp"
+#include "data_structures/KeyPress.hpp"
 #include "data_structures/Marker.hpp"
+#include "lsl_cpp.h"
 #include "renderer/Renderer.hpp"
 #include "scene/Scene.hpp"
 #include "scene/SceneObject.hpp"
@@ -19,6 +23,44 @@
 namespace {
 constexpr int  kCanvasSize     = 10;
 constexpr auto kRenderSpinWait = std::chrono::milliseconds(30);
+// SDL stamps events in whole milliseconds, so a press can read up to one tick early.
+constexpr double kSdlTickSeconds = 0.001;
+
+void pushKeyDown(SDL_Scancode key, bool repeat = false) {
+    SDL_Event event{};
+    event.type                = SDL_KEYDOWN;
+    event.key.keysym.scancode = key;
+    event.key.repeat          = repeat ? 1 : 0;
+    ASSERT_EQ(SDL_PushEvent(&event), 1);
+}
+
+std::vector<Marker> drain(moodycamel::ConcurrentQueue<Marker>& queue) {
+    std::vector<Marker> markers;
+    Marker              marker;
+    while (queue.try_dequeue(marker)) {
+        markers.push_back(marker);
+    }
+    return markers;
+}
+
+// Records the key presses of each frame it is updated in, then hands the frame to `onFrame`.
+class FrameProbe : public Component {
+   public:
+    FrameProbe(const std::shared_ptr<SceneObject>& owner,
+               std::vector<std::vector<KeyPress>>* frames,
+               std::function<void(const Context&)> onFrame)
+        : Component(owner), frames(frames), onFrame(std::move(onFrame)) {}
+
+    void update(const Context& context) override {
+        frames->emplace_back(context.keyPresses.begin(), context.keyPresses.end());
+        onFrame(context);
+    }
+    void render(SDL_Renderer* renderer) override { (void)renderer; }
+
+   private:
+    std::vector<std::vector<KeyPress>>* frames;
+    std::function<void(const Context&)> onFrame;
+};
 
 class CustomComponent : public Component {
    public:
@@ -264,4 +306,106 @@ TEST_F(RendererTest, RenderLoop_WhenSceneExpired_KeepsRunningWithoutCrashing) {
 
     Marker marker;
     EXPECT_FALSE(markerQueue->try_dequeue(marker));
+}
+
+TEST_F(RendererTest, RenderLoop_PassesKeyPressesToTheSceneStampedOnTheLslClock) {
+    auto                               scene = std::make_shared<Scene>();
+    auto                               obj   = std::make_shared<SceneObject>("obj");
+    std::stop_source                   stopSource;
+    std::vector<std::vector<KeyPress>> frames;
+
+    obj->addComponent(std::make_unique<FrameProbe>(
+        obj, &frames, [&stopSource](const Context&) { stopSource.request_stop(); }));
+    scene->addObject(obj);
+
+    const double before = lsl::local_clock();
+    pushKeyDown(SDL_SCANCODE_SPACE);
+    pushKeyDown(SDL_SCANCODE_SPACE, /*repeat=*/true);  // holding a key down is not a new press
+    pushKeyDown(SDL_SCANCODE_A);
+
+    Renderer renderer(scene, makeSoftwareRenderer(),
+                      std::make_shared<moodycamel::ConcurrentQueue<Marker>>());
+    renderer.render(stopSource.get_token());
+
+    ASSERT_EQ(frames.size(), 1U);
+    const auto& presses = frames.front();
+    ASSERT_EQ(presses.size(), 2U);
+    EXPECT_EQ(presses[0].key, SDL_SCANCODE_SPACE);
+    EXPECT_EQ(presses[1].key, SDL_SCANCODE_A);
+    EXPECT_GE(presses[0].timestamp, before - kSdlTickSeconds);
+    EXPECT_LE(presses[1].timestamp, lsl::local_clock());
+}
+
+TEST_F(RendererTest, RenderLoop_PassesEachKeyPressToOneFrameOnly) {
+    auto                               scene = std::make_shared<Scene>();
+    auto                               obj   = std::make_shared<SceneObject>("obj");
+    std::stop_source                   stopSource;
+    std::vector<std::vector<KeyPress>> frames;
+
+    obj->addComponent(
+        std::make_unique<FrameProbe>(obj, &frames, [&stopSource, &frames](const Context&) {
+            if (frames.size() == 2) {
+                stopSource.request_stop();
+            }
+        }));
+    scene->addObject(obj);
+
+    pushKeyDown(SDL_SCANCODE_SPACE);
+
+    Renderer renderer(scene, makeSoftwareRenderer(),
+                      std::make_shared<moodycamel::ConcurrentQueue<Marker>>());
+    renderer.render(stopSource.get_token());
+
+    ASSERT_EQ(frames.size(), 2U);
+    EXPECT_EQ(frames[0].size(), 1U);
+    EXPECT_TRUE(frames[1].empty());
+}
+
+// The runtime polls events while it waits for the EEG stream, before anything is recorded.
+TEST_F(RendererTest, PollEvents_KeyPressedBeforeRender_NeverReachesTheScene) {
+    auto                               scene = std::make_shared<Scene>();
+    auto                               obj   = std::make_shared<SceneObject>("obj");
+    std::stop_source                   stopSource;
+    std::vector<std::vector<KeyPress>> frames;
+
+    obj->addComponent(std::make_unique<FrameProbe>(
+        obj, &frames, [&stopSource](const Context&) { stopSource.request_stop(); }));
+    scene->addObject(obj);
+
+    Renderer renderer(scene, makeSoftwareRenderer(),
+                      std::make_shared<moodycamel::ConcurrentQueue<Marker>>());
+    pushKeyDown(SDL_SCANCODE_SPACE);
+    EXPECT_FALSE(renderer.pollEvents());
+    renderer.render(stopSource.get_token());
+
+    ASSERT_EQ(frames.size(), 1U);
+    EXPECT_TRUE(frames.front().empty());
+}
+
+TEST_F(RendererTest, RenderLoop_QueuesTimedMarkersWithTheirOwnTime) {
+    constexpr double                   kKeyPressTime = 42.0;
+    auto                               scene         = std::make_shared<Scene>();
+    auto                               obj           = std::make_shared<SceneObject>("obj");
+    std::stop_source                   stopSource;
+    std::vector<std::vector<KeyPress>> frames;
+
+    obj->addComponent(
+        std::make_unique<FrameProbe>(obj, &frames, [&stopSource](const Context& context) {
+            context.markers->push_back("flip");
+            context.timedMarkers->push_back(Marker{"response", kKeyPressTime});
+            stopSource.request_stop();
+        }));
+    scene->addObject(obj);
+
+    auto         markerQueue = std::make_shared<moodycamel::ConcurrentQueue<Marker>>();
+    Renderer     renderer(scene, makeSoftwareRenderer(), markerQueue);
+    const double before = lsl::local_clock();
+    renderer.render(stopSource.get_token());
+
+    const auto markers = drain(*markerQueue);
+    ASSERT_EQ(markers.size(), 2U);
+    EXPECT_EQ(markers[0].eventName, "flip");
+    EXPECT_GE(markers[0].timestamp, before);
+    EXPECT_EQ(markers[1].eventName, "response");
+    EXPECT_DOUBLE_EQ(markers[1].timestamp, kKeyPressTime);
 }

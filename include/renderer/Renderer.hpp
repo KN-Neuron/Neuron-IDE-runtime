@@ -6,6 +6,9 @@
 
 #include <memory>
 #include <thread>
+#include <vector>
+
+#include "data_structures/KeyPress.hpp"
 
 class Scene;
 struct Marker;
@@ -26,6 +29,8 @@ class Renderer {
 
     // Handles every pending window event and returns true when the operator asked to close the
     // window. Call it whenever events are polled outside render(), so a device reset is not lost.
+    // Key presses are kept only until the next call, so one made outside render() never reaches
+    // the scene.
     bool pollEvents();
 
    private:
@@ -38,7 +43,9 @@ class Renderer {
     std::shared_ptr<SDL_Renderer>                        sdlRenderer;
     std::weak_ptr<Scene>                                 currentScene;
     std::shared_ptr<moodycamel::ConcurrentQueue<Marker>> markerQueue;
-    std::jthread                                         renderThread;
+    // Keys that went down during the last pollEvents(), oldest first.
+    std::vector<KeyPress> keyPresses;
+    std::jthread          renderThread;
 };
 
 #endif  // RENDERER_HPP
