@@ -30,6 +30,10 @@ message MarkerEmitterComponent {
   repeated Binding bindings = 1;
 }
 
+message LifetimeComponent {
+  uint32 duration_ms = 1;
+}
+
 message Transform {
   double x = 1;
   double y = 2;
@@ -45,6 +49,7 @@ message Component {
     BlinkComponent blinker = 3;
     ScriptComponent script = 4;
     MarkerEmitterComponent marker_emitter = 5;
+    LifetimeComponent lifetime = 6;
   }
 }
 

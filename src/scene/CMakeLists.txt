@@ -26,6 +26,7 @@ add_library(scene OBJECT
     components/SpriteRenderer.cpp
     components/TextRenderer.cpp
     components/ScriptComponent.cpp
+    components/LifetimeComponent.cpp
 )
 target_include_directories(scene PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
