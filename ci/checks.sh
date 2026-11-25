@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 build=${BUILD_DIR:-build}
 
 check_format() {
-    find src include tests -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" -o -name "*.h" \) \
+    find src include tests tools -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" -o -name "*.h" \) \
         -print0 | xargs -0 clang-format-20 --dry-run -Werror
 }
 
@@ -42,14 +42,15 @@ check_tidy() {
 
     local files
     if [[ -n $base ]] && git diff --quiet "$base" -- .clang-tidy; then
-        local patterns=('src/*.cpp' 'src/*.hpp' 'include/*.hpp' 'tests/*.cpp' 'tests/*.hpp')
+        local patterns=('src/*.cpp' 'src/*.hpp' 'include/*.hpp' 'tests/*.cpp' 'tests/*.hpp'
+                        'tools/*.cpp')
         echo "clang-tidy: files changed since $base"
         # Untracked files exist only in a local working tree, never in CI's checkout.
         files=$(git diff --name-only --diff-filter=d "$base" -- "${patterns[@]}"
                 git ls-files --others --exclude-standard -- "${patterns[@]}")
     else
         echo "clang-tidy: every file"
-        files=$(git ls-files 'src/*.cpp' 'tests/*.cpp')
+        files=$(git ls-files 'src/*.cpp' 'tests/*.cpp' 'tools/*.cpp')
     fi
     if [[ -z $files ]]; then
         echo "No C++ files changed."

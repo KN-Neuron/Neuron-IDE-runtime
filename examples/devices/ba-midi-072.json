@@ -1,0 +1,33 @@
+{
+  "config_version": "1.1",
+  "device_name": "BrainAccess MIDI (BA MIDI 072)",
+  "montage_standard": "10-20",
+  "lsl_stream": {
+    "name": "KNeuron BA MIDI 072",
+    "type": "EEG",
+    "source_id": "kneuron-BA MIDI 072",
+    "expected_channel_count": 16,
+    "expected_sample_rate_hz": 250
+  },
+  "reference": { "label": "Fp1", "scheme": "physical" },
+  "channels": [
+    { "index": 0, "label": "P8", "enabled": true, "unit": "microvolts" },
+    { "index": 1, "label": "O2", "enabled": true, "unit": "microvolts" },
+    { "index": 2, "label": "P4", "enabled": true, "unit": "microvolts" },
+    { "index": 3, "label": "C4", "enabled": true, "unit": "microvolts" },
+    { "index": 4, "label": "F8", "enabled": true, "unit": "microvolts" },
+    { "index": 5, "label": "F4", "enabled": true, "unit": "microvolts" },
+    { "index": 6, "label": "Oz", "enabled": true, "unit": "microvolts" },
+    { "index": 7, "label": "Cz", "enabled": true, "unit": "microvolts" },
+    { "index": 8, "label": "Fz", "enabled": true, "unit": "microvolts" },
+    { "index": 9, "label": "Pz", "enabled": true, "unit": "microvolts" },
+    { "index": 10, "label": "F3", "enabled": true, "unit": "microvolts" },
+    { "index": 11, "label": "O1", "enabled": true, "unit": "microvolts" },
+    { "index": 12, "label": "P7", "enabled": true, "unit": "microvolts" },
+    { "index": 13, "label": "C3", "enabled": true, "unit": "microvolts" },
+    { "index": 14, "label": "P3", "enabled": true, "unit": "microvolts" },
+    { "index": 15, "label": "F7", "enabled": true, "unit": "microvolts" }
+  ],
+  "display": { "index": 0, "fullscreen": false, "width": 1280, "height": 720 },
+  "output": { "format": "csv" }
+}

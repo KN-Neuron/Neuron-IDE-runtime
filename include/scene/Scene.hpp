@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "data_structures/Marker.hpp"
 #include "scene/ImageLibrary.hpp"
 
 class Delegate;
@@ -23,6 +24,7 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // The frame being updated, or null between frames.
     const Context*           frame = nullptr;
     std::vector<std::string> heldMarkers;
+    std::vector<Marker>      heldTimedMarkers;
 
    public:
     void setExperimentName(const std::string& name) { experimentName = name; }
@@ -39,6 +41,9 @@ class Scene : public std::enable_shared_from_this<Scene> {
     // Adds a marker to the frame being updated. One emitted between frames (by a script's
     // on_start) is held for the next frame, whether or not its object is active then.
     void emitMarker(std::string name);
+    // Records a marker that keeps its own time, such as a response stamped with its key press.
+    // Held between frames like emitMarker's.
+    void emitTimedMarker(Marker marker);
 
     void onSceneReady();
     // Uploads the scene's images to `target`, then hands it to every component. Runs before the

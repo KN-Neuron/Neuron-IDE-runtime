@@ -1,0 +1,53 @@
+# Laid out for a 1280x720 window. Objects are drawn in this order, so later ones end up on top.
+#
+# A visual oddball. p300.py flashes Target (a red circle, rare) and Standard (a blue circle,
+# frequent) one at a time, each at a new random place, while the participant looks at Cross.
+project_name: "p300"
+
+# First, so the objects it shows, hides or moves in a frame are updated in that same frame.
+scene_objects {
+  name: "Trials"
+  is_visible: true
+  components { script { script_path: "p300.py" } }
+}
+
+scene_objects {
+  name: "Instructions"
+  is_visible: true
+  transform { x: 90 y: 240 width: 1100 height: 240 }
+  components {
+    text {
+      text: "Patrz na krzyżyk na środku ekranu.\nW różnych miejscach będą na chwilę pojawiać się kółka.\nLicz w myślach czerwone kółka, a niebieskie pomijaj."
+      font_size: 36
+    }
+  }
+}
+
+# Centred in the window; the script keeps the circles clear of it.
+scene_objects {
+  name: "Cross"
+  is_visible: false
+  transform { x: 600 y: 320 width: 80 height: 80 }
+  components { text { text: "+" font_size: 64 } }
+}
+
+# The script moves both circles before each flash; x and y here do not matter.
+scene_objects {
+  name: "Target"
+  is_visible: false
+  transform { x: 0 y: 0 width: 120 height: 120 }
+  components { renderer { img_path: "target.png" } }
+}
+scene_objects {
+  name: "Standard"
+  is_visible: false
+  transform { x: 0 y: 0 width: 120 height: 120 }
+  components { renderer { img_path: "standard.png" } }
+}
+
+scene_objects {
+  name: "Thanks"
+  is_visible: false
+  transform { x: 140 y: 280 width: 1000 height: 160 }
+  components { text { text: "Koniec. Dziękujemy!\nIle było czerwonych kółek?" font_size: 48 } }
+}

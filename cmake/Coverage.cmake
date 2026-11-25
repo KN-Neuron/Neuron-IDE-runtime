@@ -26,6 +26,7 @@ if(NEURON_IDE_ENABLE_COVERAGE)
             --root ${CMAKE_SOURCE_DIR}
             --exclude ".*_deps.*"
             --exclude ".*tests.*"
+            --exclude "${CMAKE_SOURCE_DIR}/tools/.*"
             --exclude ".*test.*"
             --exclude ".*protoFiles.*"
             --exclude ".*pb.*"

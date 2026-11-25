@@ -23,7 +23,8 @@ class Component;
 // not load stops the run before the window opens. on_start runs then too: before the EEG stream is
 // awaited and the recording starts, so the markers it emits are held for the first frame. An
 // exception that escapes a hook stops the experiment. What a script can reach is the `neuronide`
-// module, defined in ScriptComponent.cpp.
+// module, defined in ScriptComponent.cpp. Key callbacks a script binds with on_key run in update,
+// before on_update, one call per press.
 //
 // Hooks run inside the frame, so they must not block, and print() is logged, so nothing should
 // print every frame.

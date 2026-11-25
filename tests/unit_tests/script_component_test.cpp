@@ -5,6 +5,7 @@
 #include <exception>
 #include <fstream>
 #include <memory>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -12,6 +13,8 @@
 #include <vector>
 
 #include "data_structures/Context.hpp"
+#include "data_structures/KeyPress.hpp"
+#include "data_structures/Marker.hpp"
 #include "events/MarkerEventLink.hpp"
 #include "events/Subscription.hpp"
 #include "neuronide.pb.h"
@@ -31,6 +34,13 @@ constexpr double        kFrameTime  = 0.25;
 constexpr double        kLongFrame  = 0.5;
 constexpr double        kObjectSize = 100.0;
 constexpr std::uint32_t kFontSize   = 12;
+// LSL times of key presses and of a marker, as the scripts below print them.
+constexpr double kFirstPress  = 12.5;
+constexpr double kSecondPress = 13.25;
+constexpr double kStartTime   = 1.5;
+// Where MovesObjects puts "Target".
+constexpr double kMovedX = 40.0;
+constexpr double kMovedY = 102.5;
 
 NeuronIDE::SceneObject* addObject(NeuronIDE::Scene& proto, const std::string& name) {
     auto* object = proto.add_scene_objects();
@@ -46,6 +56,26 @@ std::vector<std::string> frame(Scene& scene, double deltaTime = kFrameTime) {
     std::vector<std::string> markers;
     scene.update(Context{deltaTime, &markers});
     return markers;
+}
+
+struct FrameOutput {
+    std::vector<std::string> markers;
+    std::vector<Marker>      timedMarkers;
+};
+
+// Runs one frame in which `keys` went down.
+FrameOutput frameWithKeys(Scene& scene, std::span<const KeyPress> keys = {}) {
+    FrameOutput output;
+    scene.update(Context{.timestamp    = kFrameTime,
+                         .markers      = &output.markers,
+                         .timedMarkers = &output.timedMarkers,
+                         .keyPresses   = keys});
+    return output;
+}
+
+void expectMarker(const Marker& marker, std::string_view name, double time) {
+    EXPECT_EQ(marker.eventName, name);
+    EXPECT_DOUBLE_EQ(marker.timestamp, time);
 }
 
 bool contains(std::string_view text, std::string_view part) {
@@ -376,6 +406,174 @@ class Trial(neuronide.Script):
 )");
 
     EXPECT_TRUE(contains(error, "'Plain' has no TextRenderer")) << error;
+}
+
+TEST_F(ScriptComponentTest, CallsKeyCallbacksWithThePressTimeBeforeOnUpdate) {
+    const auto                  scene = load(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.on_key("space", lambda time: self.emit_marker(f"space at {time}"))
+        self.on_key("Return", lambda time: self.emit_marker(f"return at {time}"))
+
+    def on_update(self, dt):
+        self.emit_marker("updated")
+)");
+    const std::vector<KeyPress> presses{{SDL_SCANCODE_RETURN, kFirstPress},
+                                        {SDL_SCANCODE_A, kFirstPress},
+                                        {SDL_SCANCODE_SPACE, kSecondPress}};
+
+    EXPECT_EQ(frameWithKeys(*scene, presses).markers,
+              (std::vector<std::string>{"return at 12.5", "space at 13.25", "updated"}));
+    EXPECT_EQ(frameWithKeys(*scene).markers, (std::vector<std::string>{"updated"}));
+}
+
+TEST_F(ScriptComponentTest, CallsEveryCallbackBoundToAKeyInTheOrderTheyWereBound) {
+    const auto                  scene = load(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.on_key("Space", lambda time: self.emit_marker("first"))
+        self.on_key("Space", self.second)
+
+    def second(self, time):
+        self.emit_marker("second")
+        self.on_key("Space", lambda time: self.emit_marker("bound by second"))
+)");
+    const std::vector<KeyPress> press{{SDL_SCANCODE_SPACE, kFirstPress}};
+
+    EXPECT_EQ(frameWithKeys(*scene, press).markers,
+              (std::vector<std::string>{"first", "second", "bound by second"}));
+}
+
+TEST_F(ScriptComponentTest, IgnoresKeysWhileItsObjectIsInactive) {
+    const auto                  scene = load(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.on_key("Space", lambda time: self.emit_marker("pressed"))
+        self.obj.active = False
+)");
+    const std::vector<KeyPress> press{{SDL_SCANCODE_SPACE, kFirstPress}};
+
+    EXPECT_TRUE(frameWithKeys(*scene, press).markers.empty());
+}
+
+TEST_F(ScriptComponentTest, RecordsMarkersWithTheirOwnTime) {
+    const auto                  scene = load(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.emit_marker("started", time=1.5)
+        self.on_key("Space", lambda time: self.emit_marker("response", time=time))
+)");
+    const std::vector<KeyPress> press{{SDL_SCANCODE_SPACE, kFirstPress}};
+
+    const FrameOutput first  = frameWithKeys(*scene, press);
+    const FrameOutput second = frameWithKeys(*scene);
+
+    EXPECT_TRUE(first.markers.empty());
+    ASSERT_EQ(first.timedMarkers.size(), 2U);
+    expectMarker(first.timedMarkers[0], "started", kStartTime);
+    expectMarker(first.timedMarkers[1], "response", kFirstPress);
+    EXPECT_TRUE(second.timedMarkers.empty());
+}
+
+TEST_F(ScriptComponentTest, RejectsAMarkerTimeThatIsNotFinite) {
+    const std::string error = loadError(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.emit_marker("never", time=float("nan"))
+)");
+
+    EXPECT_TRUE(contains(error, "ValueError: a marker's time must be finite")) << error;
+}
+
+TEST_F(ScriptComponentTest, RejectsAnUnknownKey) {
+    const std::string error = loadError(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.on_key("Spcae", lambda time: None)
+)");
+
+    EXPECT_TRUE(contains(error, "ValueError: no key named 'Spcae'")) << error;
+}
+
+TEST_F(ScriptComponentTest, RejectsAKeyCallbackThatCannotBeCalled) {
+    const std::string error = loadError(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.on_key("Space", "respond")
+)");
+
+    EXPECT_TRUE(contains(error, "TypeError: on_key needs a function to call")) << error;
+}
+
+TEST_F(ScriptComponentTest, ReportsAnExceptionInAKeyCallback) {
+    const auto                  scene = load(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.on_key("Space", lambda time: 1 / 0)
+)");
+    const std::vector<KeyPress> press{{SDL_SCANCODE_SPACE, kFirstPress}};
+
+    try {
+        frameWithKeys(*scene, press);
+        FAIL() << "the exception in the key callback was swallowed";
+    } catch (const std::runtime_error& error) {
+        EXPECT_TRUE(contains(error.what(), "a key callback failed")) << error.what();
+        EXPECT_TRUE(contains(error.what(), "ZeroDivisionError")) << error.what();
+    }
+}
+
+TEST_F(ScriptComponentTest, MovesObjects) {
+    const auto scene  = load(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        target = self.scene.find("Target")
+        target.x = 40
+        target.y = target.height + 2.5
+        self.emit_marker(f"{target.x} {target.y} {target.width}x{target.height}")
+)");
+    const auto target = scene->findObject("Target");
+
+    EXPECT_EQ(frame(*scene), (std::vector<std::string>{"40.0 102.5 100.0x100.0"}));
+    EXPECT_DOUBLE_EQ(target->transform.posX, kMovedX);
+    EXPECT_DOUBLE_EQ(target->transform.posY, kMovedY);
+}
+
+TEST_F(ScriptComponentTest, RejectsAPositionThatIsNotAFiniteNumberOfPixels) {
+    const std::string infinite = loadError(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.obj.x = float("inf")
+)");
+    const std::string tooFar   = loadError(R"(
+import neuronide
+
+class Trial(neuronide.Script):
+    def on_start(self):
+        self.obj.y = 1e12
+)");
+
+    EXPECT_TRUE(contains(infinite, "ValueError: x must be a finite number of pixels")) << infinite;
+    EXPECT_TRUE(contains(tooFar, "ValueError: y must be a finite number of pixels")) << tooFar;
 }
 
 TEST_F(ScriptComponentTest, ReportsAMissingFile) {

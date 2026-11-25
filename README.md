@@ -455,7 +455,7 @@ Update the row in the same PR that changes it.
 | MarkerEmitter | Emits an LSL marker on a scene event, ideally when an object appears or disappears. | `MarkerEmitterComponent` (`marker_emitter = 5`). Missing from the backend's copy | `MarkerEmitterComponent`, registered | **Implemented**: binds to an object's `activate` and `deactivate` events, which fire in the first frame the object is active (`SceneObject::isActive`) and in the first frame it is inactive again, so the marker is stamped with the flip that shows or hides it. An object active from the start fires `activate` in the first frame. A blinker's flicker fires neither. No component exposes an event yet, so a binding to any other event fails at parse time | [#42][rt-42], [backend#23][be-23] |
 | Lifetime | Keeps the object visible for N ms, then hides it. | — | — | **Not started** | — |
 | ResponseListener | While its object is active, records which key was pressed and the reaction time. | — | — | **Not started**. Key presses already reach every component through `Context::keyPresses` (see *Input and reaction time* below) | [#43][rt-43] |
-| ScriptComponent | Custom logic in Python, outside the standard components. | `ScriptComponent` (`script = 4`), `script_path` | `ScriptComponent`, registered | **Partial**: one script per object. The file defines exactly one `neuronide.Script` subclass, with optional hooks `on_start()` (once, while the scene is parsed: before the EEG wait and the recording) and `on_update(dt)` (every frame while its object is active). A script finds objects (`self.scene.find`), shows and hides them (`obj.active`), changes their text (`obj.text`) and emits markers stamped with the flip of the current frame (`self.emit_marker`); markers from `on_start` go with the first frame. Its parameters (trial counts, timings) live in the script, not in the proto. A script that does not load, or raises in `on_start`, stops the run before the window opens; an exception in `on_update` stops the experiment. Not yet: key input ([#43][rt-43]), subscribing to events ([#42][rt-42]), ending the experiment, its own exit code ([#37][rt-37]) | [#44][rt-44], [backend#25][be-25] |
+| ScriptComponent | Custom logic in Python, outside the standard components. | `ScriptComponent` (`script = 4`), `script_path` | `ScriptComponent`, registered | **Partial**: one script per object. The file defines exactly one `neuronide.Script` subclass, with optional hooks `on_start()` (once, while the scene is parsed: before the EEG wait and the recording) and `on_update(dt)` (every frame while its object is active). A script finds objects (`self.scene.find`), shows and hides them (`obj.active`), moves them (`obj.x`, `obj.y`; `obj.width` and `obj.height` read only), changes their text (`obj.text`) and emits markers stamped with the flip of the current frame (`self.emit_marker`); markers from `on_start` go with the first frame. `self.on_key("Space", callback)` calls `callback(time)` for every press of that key while the script's object is active, before `on_update`, with the press's LSL time; `self.emit_marker(name, time=time)` records a marker at that time instead of the flip's. Its parameters (trial counts, timings) live in the script, not in the proto. A script that does not load, or raises in `on_start`, stops the run before the window opens; an exception in `on_update` stops the experiment. Not yet: subscribing to events ([#42][rt-42]), ending the experiment, its own exit code ([#37][rt-37]) | [#44][rt-44], [#43][rt-43], [backend#25][be-25] |
 | AudioSource | Plays a sound. Possibly post-MVP. | — | — | **Not started** | — |
 
 - **Implemented**: registered class, behaviour complete, covered by tests.
@@ -492,8 +492,9 @@ Update the row in the same PR that changes it.
   is known to within one frame (~16.7 ms at 60 Hz). Keys pressed while the runtime waits
   for the EEG stream never reach the scene. A component records a response with its own
   time through `Context::timedMarkers`, and reaction time is computed offline against the
-  onset marker. Nothing consumes key presses yet: scripts can't bind keys ([#43][rt-43]),
-  Escape isn't reserved for the operator ([#37][rt-37]) and ResponseListener isn't started.
+  onset marker. Scripts bind keys with `on_key` and record responses with
+  `emit_marker(name, time=)` (see `examples/reaction-time`). Escape isn't reserved for the
+  operator yet ([#37][rt-37]) and ResponseListener isn't started.
   ResponseListener should judge a press by its time, not by `isActive`: a press read in
   the frame an object becomes active, or in the next one, may predate the flip that shows
   it, and one made just before the flip that hides it is read after the object is inactive.
@@ -525,6 +526,8 @@ Neuron-IDE-runtime/       # the C++ runtime (git repo)
   ├── CMakeLists.txt        # top-level: deps, warnings, static analysis, coverage
   ├── cmake/                # Dependencies / CompilerWarnings / StaticAnalysis / Coverage / EmbedDefaultFont
   ├── assets/fonts/         # the font compiled into the binary, with its license
+  ├── examples/             # experiments you can run (examples/run.sh), each with its own README
+  ├── tools/                # fake_eeg: a fake EEG stream shaped like a config.json
   ├── ci/                   # Dockerfile (CI's image), checks.sh (CI's checks), run-locally.sh (§9 "Running CI locally")
   ├── protoFiles/
   │   ├── neuronide.proto   # experiment file schema

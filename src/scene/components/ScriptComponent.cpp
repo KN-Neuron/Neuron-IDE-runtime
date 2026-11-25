@@ -1,8 +1,14 @@
 #include "scene/components/ScriptComponent.hpp"
 
+#include <SDL2/SDL_keyboard.h>
 #include <pybind11/embed.h>
+#include <pybind11/stl.h>
 
+#include <cmath>
+#include <cstddef>
 #include <filesystem>
+#include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -10,6 +16,8 @@
 #include <vector>
 
 #include "data_structures/Context.hpp"
+#include "data_structures/KeyPress.hpp"
+#include "data_structures/Marker.hpp"
 #include "neuronide.pb.h"
 #include "scene/Scene.hpp"
 #include "scene/SceneObject.hpp"
@@ -33,6 +41,12 @@ struct ScriptComponent::Host {
     script_api::ScriptBase* base = nullptr;
     py::object              onStart;
     py::object              onUpdate;
+
+    struct KeyBinding {
+        SDL_Scancode key;
+        py::object   callback;
+    };
+    std::vector<KeyBinding> keyBindings;
 
     // A Python exception becomes a std::runtime_error here, while the interpreter still runs: an
     // error_already_set that outlived it would crash when destroyed.
@@ -89,9 +103,30 @@ class ObjectRef {
         return *renderer;
     }
 
+    static double requirePixel(double value, std::string_view axis) {
+        // The renderers draw in float and TextRenderer centres in int, so a position must fit both.
+        if (!std::isfinite(value) ||
+            std::abs(value) > static_cast<double>(std::numeric_limits<int>::max())) {
+            throw py::value_error(std::string(axis) + " must be a finite number of pixels, got " +
+                                  std::to_string(value));
+        }
+        return value;
+    }
+
    private:
     std::weak_ptr<SceneObject> object;
 };
+
+// SDL's name for the key (case does not matter) as its scancode, the physical key a KeyPress
+// carries.
+SDL_Scancode scancodeNamed(const std::string& name) {
+    const SDL_Scancode key = SDL_GetScancodeFromName(name.c_str());
+    if (key == SDL_SCANCODE_UNKNOWN) {
+        throw py::value_error("no key named '" + name +
+                              "'; use SDL's key names, such as 'Space', 'Return', 'Left' or 'A'");
+    }
+    return key;
+}
 
 // neuronide.Scene
 class SceneRef {
@@ -152,6 +187,7 @@ py::object loadScriptClass(const std::filesystem::path& scriptPath, const std::s
 
 PYBIND11_EMBEDDED_MODULE(neuronide, module) {
     using script_api::ObjectRef;
+    using script_api::scancodeNamed;
     using script_api::SceneRef;
     using script_api::ScriptBase;
 
@@ -167,7 +203,25 @@ PYBIND11_EMBEDDED_MODULE(neuronide, module) {
         .def_property(
             "text", [](const ObjectRef& ref) { return ref.text().getText(); },
             [](const ObjectRef& ref, std::string_view text) { ref.text().setText(text); },
-            "The text of the object's TextRenderer.");
+            "The text of the object's TextRenderer.")
+        .def_property(
+            "x", [](const ObjectRef& ref) { return ref.get()->transform.posX; },
+            [](const ObjectRef& ref, double left) {
+                ref.get()->transform.posX = ObjectRef::requirePixel(left, "x");
+            },
+            "The left edge, in window pixels. A change shows in the frame it is made in.")
+        .def_property(
+            "y", [](const ObjectRef& ref) { return ref.get()->transform.posY; },
+            [](const ObjectRef& ref, double top) {
+                ref.get()->transform.posY = ObjectRef::requirePixel(top, "y");
+            },
+            "The top edge, in window pixels, counted downwards.")
+        .def_property_readonly(
+            "width", [](const ObjectRef& ref) { return ref.get()->transform.width; },
+            "The width in pixels, as the experiment file sets it.")
+        .def_property_readonly(
+            "height", [](const ObjectRef& ref) { return ref.get()->transform.height; },
+            "The height in pixels, as the experiment file sets it.");
 
     py::class_<SceneRef>(module, "Scene")
         .def("find", &SceneRef::find, py::arg("name"),
@@ -183,12 +237,36 @@ PYBIND11_EMBEDDED_MODULE(neuronide, module) {
             "The whole scene.")
         .def(
             "emit_marker",
-            [](const ScriptBase& self, std::string name) {
-                SceneRef(self.attached().scene).get()->emitMarker(std::move(name));
+            [](const ScriptBase& self, std::string name, std::optional<double> time) {
+                const auto scene = SceneRef(self.attached().scene).get();
+                if (!time) {
+                    scene->emitMarker(std::move(name));
+                    return;
+                }
+                if (!std::isfinite(*time)) {
+                    throw py::value_error("a marker's time must be finite");
+                }
+                scene->emitTimedMarker(Marker{.eventName = std::move(name), .timestamp = *time});
             },
-            py::arg("name"),
-            "Records a marker, stamped with the time the current frame appears on screen. "
-            "Markers emitted in on_start get the first frame's time.");
+            py::arg("name"), py::arg("time") = py::none(),
+            "Records a marker. Without `time` it is stamped with the time the current frame "
+            "appears on screen, and markers emitted in on_start get the first frame's time. "
+            "`time` is on the LSL clock, like the time an on_key callback gets: pass it to record "
+            "a response at the moment of its key press.")
+        .def(
+            "on_key",
+            [](const ScriptBase& self, const std::string& key, py::object callback) {
+                if (PyCallable_Check(callback.ptr()) == 0) {
+                    throw py::type_error("on_key needs a function to call");
+                }
+                self.attached().keyBindings.push_back({scancodeNamed(key), std::move(callback)});
+            },
+            py::arg("key"), py::arg("callback"),
+            "Calls `callback(time)` whenever `key` goes down, for the rest of the run. `key` is "
+            "SDL's name for it, such as 'Space', 'Return', 'Left' or 'A', and means the same "
+            "physical key on any keyboard layout. `time` is when the key went down, on the LSL "
+            "clock, to within one frame. Callbacks run at the start of the frame after the press, "
+            "before on_update, and only while the script's object is active.");
 }
 
 ScriptComponent::ScriptComponent(const std::shared_ptr<SceneObject>& owner,
@@ -237,6 +315,16 @@ void ScriptComponent::onSceneReady(Scene& scene) {
 }
 
 void ScriptComponent::update(const Context& context) {
+    for (const KeyPress& press : context.keyPresses) {
+        // By index, and the callback copied: a callback may bind more keys, which moves the rest.
+        for (std::size_t index = 0; index < host->keyBindings.size(); ++index) {
+            if (host->keyBindings[index].key != press.key) {
+                continue;
+            }
+            const py::object callback = host->keyBindings[index].callback;
+            host->call(callback, "a key callback", press.timestamp);
+        }
+    }
     if (!host->onUpdate.is_none()) {
         host->call(host->onUpdate, "on_update", context.timestamp);
     }

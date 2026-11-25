@@ -34,6 +34,11 @@ void Scene::update(const Context& ctx) {
         ctx.markers->insert(ctx.markers->end(), heldMarkers.begin(), heldMarkers.end());
     }
     heldMarkers.clear();
+    if (ctx.timedMarkers != nullptr) {
+        ctx.timedMarkers->insert(ctx.timedMarkers->end(), heldTimedMarkers.begin(),
+                                 heldTimedMarkers.end());
+    }
+    heldTimedMarkers.clear();
 
     const FrameScope scope(frame, ctx);
     for (const auto& obj : objects) {
@@ -53,6 +58,14 @@ void Scene::emitMarker(std::string name) {
         heldMarkers.push_back(std::move(name));
     } else if (frame->markers != nullptr) {
         frame->markers->push_back(std::move(name));
+    }
+}
+
+void Scene::emitTimedMarker(Marker marker) {
+    if (frame == nullptr) {
+        heldTimedMarkers.push_back(std::move(marker));
+    } else if (frame->timedMarkers != nullptr) {
+        frame->timedMarkers->push_back(std::move(marker));
     }
 }
 

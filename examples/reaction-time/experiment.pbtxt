@@ -1,0 +1,39 @@
+# Laid out for a 1280x720 window. Objects are drawn in this order, so later ones end up on top.
+#
+# The screen stays black apart from Timer, which reaction_time.py shows at random moments and
+# counts up until the participant presses space.
+project_name: "reaction_time"
+
+# First, so the objects it shows or hides in a frame are updated in that same frame.
+scene_objects {
+  name: "Trials"
+  is_visible: true
+  components { script { script_path: "reaction_time.py" } }
+}
+
+scene_objects {
+  name: "Instructions"
+  is_visible: true
+  transform { x: 90 y: 260 width: 1100 height: 200 }
+  components {
+    text {
+      text: "Co jakiś czas na środku ekranu pojawi się licznik.\nGdy go zobaczysz, jak najszybciej naciśnij spację."
+      font_size: 36
+    }
+  }
+}
+
+# Centred in the window. The script replaces the text with the milliseconds counted so far.
+scene_objects {
+  name: "Timer"
+  is_visible: false
+  transform { x: 440 y: 290 width: 400 height: 140 }
+  components { text { text: "0" font_size: 96 } }
+}
+
+scene_objects {
+  name: "Thanks"
+  is_visible: false
+  transform { x: 140 y: 300 width: 1000 height: 120 }
+  components { text { text: "Koniec. Dziękujemy!" font_size: 48 } }
+}

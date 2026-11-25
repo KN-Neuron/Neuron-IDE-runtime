@@ -23,6 +23,7 @@ if(CLANG_FORMAT_20_EXE)
         "src/*.cpp" "src/*.hpp"
         "include/*.hpp"
         "tests/*.cpp" "tests/*.hpp"
+        "tools/*.cpp"
     )
     add_custom_target(
         format
